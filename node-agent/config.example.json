@@ -12,8 +12,11 @@
   "jwt_secret": "REPLACE_WITH_JWT_SECRET",
   "happ_subscription_key": "REPLACE_RANDOM_HEX_FOR_HAPP_SUB_URL",
   "happ": {
-    "profile_title": "My VPN",
-    "region_label": "🇳🇱 NL",
+    "profile_title": "",
+    "country_code": "NL",
+    "country_flag": "🇳🇱",
+    "country_name": "Нидерланды",
+    "region_label": "",
     "support_url": "https://t.me/your_support",
     "profile_web_page_url": "",
     "subscription_total_bytes": 0,

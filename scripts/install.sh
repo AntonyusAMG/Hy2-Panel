@@ -267,7 +267,10 @@ cfg = {
     "jwt_secret": os.environ["HY2_CFG_JWT_SECRET"],
     "happ_subscription_key": os.environ.get("HY2_CFG_HAPP_SUB_KEY", ""),
     "happ": {
-        "profile_title": node[:25],
+        "profile_title": "",
+        "country_code": "",
+        "country_flag": "",
+        "country_name": "",
         "region_label": "",
         "support_url": "",
         "profile_web_page_url": "",

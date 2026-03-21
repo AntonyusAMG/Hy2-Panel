@@ -275,6 +275,55 @@ def _happ_cfg() -> dict[str, Any]:
     return h if isinstance(h, dict) else {}
 
 
+# Префикс по ISO-коду, если в конфиге не заданы country_flag / country_name
+_HAPP_COUNTRY_PRESETS: dict[str, tuple[str, str]] = {
+    "NL": ("🇳🇱", "Netherlands"),
+    "DE": ("🇩🇪", "Germany"),
+    "FI": ("🇫🇮", "Finland"),
+    "US": ("🇺🇸", "United States"),
+    "GB": ("🇬🇧", "United Kingdom"),
+    "SG": ("🇸🇬", "Singapore"),
+    "TH": ("🇹🇭", "Thailand"),
+    "VN": ("🇻🇳", "Vietnam"),
+    "RU": ("🇷🇺", "Russia"),
+    "UA": ("🇺🇦", "Ukraine"),
+    "PL": ("🇵🇱", "Poland"),
+    "FR": ("🇫🇷", "France"),
+    "ES": ("🇪🇸", "Spain"),
+    "TR": ("🇹🇷", "Turkey"),
+    "IS": ("🇮🇸", "Iceland"),
+    "CA": ("🇨🇦", "Canada"),
+}
+
+
+def _happ_country_flag_name(hc: dict[str, Any]) -> tuple[str, str]:
+    """Флаг и полное имя страны для отображения в HAPP (fragment после #)."""
+    flag = (hc.get("country_flag") or hc.get("flag") or "").strip()
+    name = (hc.get("country_name") or hc.get("country_full") or "").strip()
+    if flag and name:
+        return flag, name
+    cc = (hc.get("country_code") or "").strip().upper()
+    if cc and cc in _HAPP_COUNTRY_PRESETS:
+        pf, pn = _HAPP_COUNTRY_PRESETS[cc]
+        return (flag or pf), (name or pn)
+    return flag, name
+
+
+def _happ_fragment_for_client(tid: str, node_name: str, hc: dict[str, Any]) -> str:
+    """Текст после # в hysteria2:// — так HAPP показывает строку в списке серверов."""
+    flag, cname = _happ_country_flag_name(hc)
+    region = (hc.get("region_label") or hc.get("country") or "").strip()
+    if flag and cname:
+        core = f"{flag} {cname} · {node_name}"
+    elif cname:
+        core = f"{cname} · {node_name}"
+    elif region:
+        core = f"{region} · {node_name}"
+    else:
+        core = node_name
+    return f"{core} | ID {tid}"
+
+
 def _happ_subscription_key() -> str:
     """Ключ ?k= для /sub/…. Явный happ_subscription_key или стабильный производный от jwt_secret."""
     k = str(_config.get("happ_subscription_key") or "").strip()
@@ -363,11 +412,7 @@ def _build_hysteria2_uri_dict(tid: str) -> dict[str, Any]:
     port = _hysteria_listen_port(y)
     node_name = str(_config.get("node_name", "HY2"))
     hc = _happ_cfg()
-    region = (hc.get("region_label") or hc.get("country") or "").strip()
-    if region:
-        frag_text = f"{region} - {node_name} | ID {tid}"
-    else:
-        frag_text = f"{node_name} | ID {tid}"
+    frag_text = _happ_fragment_for_client(tid, node_name, hc)
     tid_q = quote(tid, safe="")
     pw_q = quote(password, safe="")
     sni_q = quote(domain, safe="")
@@ -411,7 +456,14 @@ async def happ_subscription_export(
     tot = _subscription_total_bytes()
     exp = _user_expire_unix(tid)
     hc = _happ_cfg()
-    title = _trunc_happ_title(str(hc.get("profile_title") or _config.get("node_name") or "VPN"))
+    pt = (hc.get("profile_title") or "").strip()
+    if not pt:
+        fl, cn = _happ_country_flag_name(hc)
+        if fl and cn:
+            pt = f"{fl} {cn}"
+        else:
+            pt = str(_config.get("node_name") or "VPN")
+    title = _trunc_happ_title(pt)
     lines = [
         f"#profile-title: {title}",
         "#profile-update-interval: 1",
