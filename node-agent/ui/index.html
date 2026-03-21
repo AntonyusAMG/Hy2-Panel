@@ -6,7 +6,7 @@
   <title>HY2 Node — панель</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" id="hljs-theme" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
   <style>
     /* === Темы: tg-dark | crm-soft | light | accent-violet (по мотивам Katasia / TG / CRM) === */
@@ -24,7 +24,7 @@
       --border: rgba(255,255,255,0.07);
       --shadow: rgba(0,0,0,0.45);
       --glow: rgba(82, 136, 193, 0.12);
-      --sidebar-w: 268px;
+      --sidebar-w: 210px;
       --radius: 14px;
       --radius-sm: 10px;
       --font: "Plus Jakarta Sans", system-ui, sans-serif;
@@ -43,7 +43,7 @@
       --border: rgba(255,255,255,0.06);
       --shadow: rgba(0,0,0,0.5);
       --glow: rgba(91, 141, 239, 0.1);
-      --sidebar-w: 268px;
+      --sidebar-w: 210px;
       --radius: 16px;
       --radius-sm: 10px;
       --font: "Plus Jakarta Sans", system-ui, sans-serif;
@@ -62,7 +62,7 @@
       --border: rgba(15,23,42,0.08);
       --shadow: rgba(15,23,42,0.08);
       --glow: rgba(37, 99, 235, 0.08);
-      --sidebar-w: 268px;
+      --sidebar-w: 210px;
       --radius: 14px;
       --radius-sm: 10px;
       --font: "Plus Jakarta Sans", system-ui, sans-serif;
@@ -81,7 +81,7 @@
       --border: rgba(255,255,255,0.07);
       --shadow: rgba(0,0,0,0.55);
       --glow: rgba(167, 139, 250, 0.12);
-      --sidebar-w: 268px;
+      --sidebar-w: 210px;
       --radius: 16px;
       --radius-sm: 10px;
       --font: "Plus Jakarta Sans", system-ui, sans-serif;
@@ -100,18 +100,20 @@
     .muted { color: var(--muted); }
     .hidden { display: none !important; }
 
-    /* ——— Login (4 темы + мягкая карточка) ——— */
+    /* ——— Login (как Visual: page-center + theme-bar) ——— */
     .login-page {
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px 16px;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
       position: relative;
       overflow: hidden;
+      font-family: "Inter", var(--font);
     }
     .login-bg {
       position: absolute;
       inset: 0;
+      z-index: 0;
       background:
         radial-gradient(ellipse 900px 500px at 15% 0%, var(--glow), transparent 55%),
         radial-gradient(ellipse 700px 400px at 100% 80%, var(--glow), transparent 50%),
@@ -125,14 +127,73 @@
       opacity: 0.04;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     }
+    .login-glow {
+      position: absolute;
+      pointer-events: none;
+      z-index: 0;
+      transition: background 0.35s;
+    }
+    .login-glow1 {
+      top: -18%;
+      left: -12%;
+      width: 52%;
+      height: 52%;
+      border-radius: 50%;
+      background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 65%);
+    }
+    .login-glow2 {
+      bottom: -18%;
+      right: -8%;
+      width: 44%;
+      height: 44%;
+      border-radius: 50%;
+      background: radial-gradient(circle, color-mix(in srgb, var(--green) 12%, transparent) 0%, transparent 65%);
+    }
+    :root[data-theme="light"] .login-glow2 {
+      background: radial-gradient(circle, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 65%);
+    }
+    .login-theme-bar {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+      max-width: min(100% - 28px, 520px);
+    }
+    .login-page-center {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 72px 20px 28px;
+      min-height: 0;
+      position: relative;
+      z-index: 1;
+    }
     .login-card {
       position: relative;
-      width: min(440px, 100%);
-      background: var(--bg1);
+      width: 100%;
+      max-width: 400px;
+      background: color-mix(in srgb, var(--bg1) 88%, transparent);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 32px 28px 30px;
-      box-shadow: 0 24px 80px var(--shadow), 0 0 0 1px var(--border) inset;
+      border-radius: 24px;
+      padding: 36px 32px 28px;
+      box-shadow: 0 24px 60px var(--shadow), 0 0 0 1px var(--border) inset;
+      backdrop-filter: blur(20px) saturate(160%);
+    }
+    .login-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--txt) 18%, transparent), transparent);
+      pointer-events: none;
+      border-radius: 24px 24px 0 0;
     }
     .login-brand {
       margin-bottom: 8px;
@@ -153,37 +214,41 @@
       margin-top: 6px;
       line-height: 1.45;
     }
-    .theme-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 20px 0 22px;
-    }
-    .theme-chips button {
+    #login-theme-chips button {
       border: 1px solid var(--border);
-      background: var(--bg2);
+      background: color-mix(in srgb, var(--bg2) 85%, transparent);
       color: var(--muted);
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: 0.75rem;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
-      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.2s, opacity 0.2s;
+      opacity: 0.85;
     }
-    .theme-chips button:hover { color: var(--txt); border-color: var(--accent); }
-    .theme-chips button.active {
-      background: linear-gradient(135deg, rgba(82,136,193,0.2), rgba(82,136,193,0.08));
+    #login-theme-chips button:hover {
+      color: var(--txt);
       border-color: var(--accent);
-      color: var(--accent2);
+      opacity: 1;
+      transform: translateY(-1px);
     }
-    :root[data-theme="light"] .theme-chips button.active {
-      background: rgba(37, 99, 235, 0.12);
-      color: var(--accent);
-    }
-    :root[data-theme="accent-violet"] .theme-chips button.active {
-      background: rgba(167, 139, 250, 0.15);
+    #login-theme-chips button.active {
+      opacity: 1;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 35%, var(--bg2)), color-mix(in srgb, var(--accent) 15%, var(--bg2)));
+      border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
       color: var(--accent2);
+      transform: scale(1.03);
+    }
+    :root[data-theme="light"] #login-theme-chips button.active {
+      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 80%, #1e40af));
+      border-color: transparent;
+      color: #fff;
+    }
+    :root[data-theme="accent-violet"] #login-theme-chips button.active {
+      background: linear-gradient(135deg, #7c4dff, #651fff);
+      border-color: transparent;
+      color: #fff;
     }
     .login-card h1 {
       font-family: Syne, sans-serif;
@@ -280,20 +345,21 @@
 
     .sidebar {
       grid-row: 2;
-      padding: 20px 14px 24px;
+      padding: 18px 8px 20px;
       border-right: 1px solid var(--border);
-      background: linear-gradient(180deg, var(--bg1) 0%, color-mix(in srgb, var(--bg0) 40%, var(--bg1)) 100%);
+      background: color-mix(in srgb, var(--bg1) 75%, transparent);
+      backdrop-filter: blur(24px) saturate(150%);
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
     }
     .sidebar-brand {
-      padding: 8px 12px 18px;
+      padding: 6px 12px 16px;
       border-bottom: 1px solid var(--border);
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
-    .sidebar-brand .t { font-weight: 800; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
-    .sidebar-brand .n { font-weight: 700; font-size: 0.95rem; margin-top: 4px; color: var(--txt); }
+    .sidebar-brand .t { font-weight: 800; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+    .sidebar-brand .n { font-family: Syne, sans-serif; font-weight: 800; font-size: 1.05rem; margin-top: 4px; color: var(--txt); letter-spacing: -0.02em; }
     .nav-btn {
       text-align: left;
       border: 0;
@@ -531,27 +597,31 @@
   </style>
 </head>
 <body>
-  <div id="view-login">
+  <div id="view-login" class="login-page">
     <div class="login-bg" aria-hidden="true"></div>
-    <div class="login-card">
-      <div class="login-brand">
-        <div class="logo">HY2 Node</div>
-        <p class="sub">Панель ноды Hysteria 2 · локальное управление</p>
+    <div class="login-glow login-glow1" aria-hidden="true"></div>
+    <div class="login-glow login-glow2" aria-hidden="true"></div>
+    <div class="login-theme-bar" id="login-theme-chips" role="group" aria-label="Тема оформления">
+      <button type="button" data-theme-set="tg-dark">TG Dark</button>
+      <button type="button" data-theme-set="crm-soft">CRM soft</button>
+      <button type="button" data-theme-set="light">Светлая</button>
+      <button type="button" data-theme-set="accent-violet">Violet</button>
+    </div>
+    <div class="login-page-center">
+      <div class="login-card">
+        <div class="login-brand">
+          <div class="logo">HY2 Node</div>
+          <p class="sub">Панель ноды Hysteria 2 · локальное управление</p>
+        </div>
+        <h1>Вход</h1>
+        <p class="lead">Учётные данные задаются при установке ноды.</p>
+        <form id="form-login" style="margin-top:18px;">
+          <div class="field"><label for="inp-login">Логин</label><input class="inp" id="inp-login" autocomplete="username" required /></div>
+          <div class="field"><label for="inp-pass">Пароль</label><input class="inp" id="inp-pass" type="password" autocomplete="current-password" required /></div>
+          <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;">Войти</button>
+          <p id="login-err" class="mono" style="color:var(--red);min-height:1.2em;margin-top:12px;font-size:0.85rem;"></p>
+        </form>
       </div>
-      <div class="theme-chips" id="login-theme-chips" role="group" aria-label="Тема оформления">
-        <button type="button" data-theme-set="tg-dark">Telegram</button>
-        <button type="button" data-theme-set="crm-soft">CRM soft</button>
-        <button type="button" data-theme-set="light">Светлая</button>
-        <button type="button" data-theme-set="accent-violet">Violet</button>
-      </div>
-      <h1>Вход</h1>
-      <p class="lead">Учётные данные задаются при установке ноды.</p>
-      <form id="form-login" style="margin-top:18px;">
-        <div class="field"><label for="inp-login">Логин</label><input class="inp" id="inp-login" autocomplete="username" required /></div>
-        <div class="field"><label for="inp-pass">Пароль</label><input class="inp" id="inp-pass" type="password" autocomplete="current-password" required /></div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;">Войти</button>
-        <p id="login-err" class="mono" style="color:var(--red);min-height:1.2em;margin-top:12px;font-size:0.85rem;"></p>
-      </form>
     </div>
   </div>
 
