@@ -917,12 +917,26 @@
     <div class="modal" style="max-width:min(560px,100%)">
       <h3>Ссылка для клиента</h3>
       <p class="lead" style="font-size:0.88rem;color:var(--muted);margin:0 0 14px;line-height:1.5;">
-        <span class="mono">hysteria2://</span> — HAPP, v2rayN и др. Строка содержит <strong>пароль</strong>.
+        <span class="mono">hysteria2://</span> — ручной импорт. Имя в приложении берётся из части после <span class="mono">#</span> (регион, нода, ID).
       </p>
-      <textarea id="uri-out" class="inp mono" readonly rows="4" style="width:100%;resize:vertical;min-height:100px;font-size:0.78rem;"></textarea>
+      <label class="field" style="display:block;margin-bottom:10px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">Одна строка (как раньше)</span>
+        <textarea id="uri-out" class="inp mono" readonly rows="3" style="width:100%;resize:vertical;min-height:72px;font-size:0.78rem;"></textarea>
+      </label>
+      <div id="uri-sub-block" class="hidden">
+        <label class="field" style="display:block;margin-bottom:8px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">Подписка HAPP (как у «коммерческих» VPN)</span>
+          <textarea id="uri-sub-out" class="inp mono" readonly rows="2" style="width:100%;resize:vertical;min-height:56px;font-size:0.76rem;"></textarea>
+        </label>
+        <p id="uri-sub-hint" class="lead" style="font-size:0.8rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
+          В HAPP: Subscriptions → + → вставьте эту <strong>HTTPS-ссылку</strong>. В группе появятся название (до 25 симв.), трафик и дата из <span class="mono">subscription-userinfo</span>.
+        </p>
+      </div>
+      <p id="uri-no-sub" class="lead hidden" style="font-size:0.8rem;color:var(--amber);margin:0 0 12px;line-height:1.45;">
+        Публичная подписка отключена: задайте <span class="mono">happ_subscription_key</span> в config.json агента и перезапустите hy2-agent.
+      </p>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
         <button type="button" class="btn btn-ghost" id="uri-close">Закрыть</button>
-        <button type="button" class="btn btn-primary" id="uri-copy">Копировать</button>
+        <button type="button" class="btn btn-ghost hidden" id="uri-copy-sub">Копировать ссылку подписки</button>
+        <button type="button" class="btn btn-primary" id="uri-copy">Копировать строку</button>
       </div>
     </div>
   </div>
@@ -1358,6 +1372,14 @@
             try {
               const r = await api('/users/' + encodeURIComponent(id) + '/client-uri');
               $('#uri-out').value = r.uri || '';
+              const sub = r.happ_subscription_url || '';
+              const subBlock = $('#uri-sub-block');
+              const noSub = $('#uri-no-sub');
+              const btnSub = $('#uri-copy-sub');
+              if (subBlock) subBlock.classList.toggle('hidden', !sub);
+              if (noSub) noSub.classList.toggle('hidden', !!sub);
+              if ($('#uri-sub-out')) $('#uri-sub-out').value = sub;
+              if (btnSub) btnSub.classList.toggle('hidden', !sub);
               $('#modal-uri').classList.remove('hidden');
             } catch (e) {
               toast(String(e.message || e), true);
@@ -1601,6 +1623,19 @@
       toast('Не удалось скопировать', true);
     }
   });
+  const btnCopySub = $('#uri-copy-sub');
+  if (btnCopySub) {
+    btnCopySub.addEventListener('click', async () => {
+      const t = $('#uri-sub-out').value;
+      if (!t) return;
+      try {
+        await navigator.clipboard.writeText(t);
+        toast('Ссылка подписки скопирована');
+      } catch (e) {
+        toast('Не удалось скопировать', true);
+      }
+    });
+  }
 
   (function initTheme() {
     let saved = localStorage.getItem(THEME_KEY);

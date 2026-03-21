@@ -17,8 +17,8 @@ from typing import Any
 import httpx
 import psutil
 import yaml
-from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import FileResponse, Response
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
@@ -78,6 +78,17 @@ async def verify_bearer(authorization: str | None = Header(None)) -> dict[str, A
         return {"kind": "jwt", "sub": payload.get("sub")}
     except JWTError:
         raise HTTPException(status_code=403, detail="Invalid token") from None
+
+
+async def verify_sub_key_or_jwt(
+    k: str | None = Query(None, description="happ_subscription_key из config.json"),
+    authorization: str | None = Header(None),
+) -> dict[str, Any]:
+    """Подписка HAPP: доступ по ?k=общий_ключ или Bearer JWT."""
+    sk = str(_config.get("happ_subscription_key") or "").strip()
+    if sk and (k or "").strip() == sk:
+        return {"kind": "subkey"}
+    return await verify_bearer(authorization)
 
 
 class LoginBody(BaseModel):
@@ -258,10 +269,65 @@ def _hysteria_public_domain(y: dict[str, Any]) -> str:
     return ""
 
 
-@app.get("/users/{telegram_id}/client-uri")
-async def client_uri(telegram_id: str, _: dict = Depends(verify_bearer)) -> dict[str, Any]:
-    """Готовая hysteria2:// ссылка для клиентов (HAPP и др.); пароль берётся из config.yaml."""
-    tid = _validate_tg_id(telegram_id)
+def _happ_cfg() -> dict[str, Any]:
+    h = _config.get("happ")
+    return h if isinstance(h, dict) else {}
+
+
+def _happ_subscription_key() -> str:
+    return str(_config.get("happ_subscription_key") or "").strip()
+
+
+def _trunc_happ_title(s: str, max_len: int = 25) -> str:
+    s = (s or "").strip()
+    if len(s) <= max_len:
+        return s
+    return s[: max_len - 1] + "…"
+
+
+def _user_expire_unix(tid: str) -> int:
+    ue = _config.get("user_expires")
+    if isinstance(ue, dict) and tid in ue:
+        try:
+            return int(ue[tid])
+        except (TypeError, ValueError):
+            pass
+    d = _happ_cfg().get("default_expire_unix")
+    try:
+        return int(d) if d is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def _subscription_total_bytes() -> int:
+    try:
+        return int(_happ_cfg().get("subscription_total_bytes", 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+async def _user_traffic_up_down(tid: str) -> tuple[int, int]:
+    try:
+        data = await _stats_request("GET", "/traffic")
+    except HTTPException:
+        return 0, 0
+    if not isinstance(data, dict):
+        return 0, 0
+    u: dict[str, Any] | None = None
+    if tid in data and isinstance(data[tid], dict):
+        u = data[tid]
+    users = data.get("users")
+    if u is None and isinstance(users, dict) and tid in users and isinstance(users[tid], dict):
+        u = users[tid]
+    if not u:
+        return 0, 0
+    up = int(u.get("tx") or u.get("upload") or 0)
+    down = int(u.get("rx") or u.get("download") or 0)
+    return up, down
+
+
+def _build_hysteria2_uri_dict(tid: str) -> dict[str, Any]:
+    """Собирает hysteria2:// и человекочитаемый fragment (#) для HAPP."""
     y = _read_hysteria_yaml()
     auth = y.get("auth") or {}
     up = auth.get("userpass") or {}
@@ -276,10 +342,16 @@ async def client_uri(telegram_id: str, _: dict = Depends(verify_bearer)) -> dict
         )
     port = _hysteria_listen_port(y)
     node_name = str(_config.get("node_name", "HY2"))
+    hc = _happ_cfg()
+    region = (hc.get("region_label") or hc.get("country") or "").strip()
+    if region:
+        frag_text = f"{region} - {node_name} | ID {tid}"
+    else:
+        frag_text = f"{node_name} | ID {tid}"
     tid_q = quote(tid, safe="")
     pw_q = quote(password, safe="")
     sni_q = quote(domain, safe="")
-    frag_q = quote(node_name, safe="")
+    frag_q = quote(frag_text, safe="")
     uri = f"hysteria2://{tid_q}:{pw_q}@{domain}:{port}/?sni={sni_q}&insecure=0#{frag_q}"
     return {
         "uri": uri,
@@ -287,7 +359,61 @@ async def client_uri(telegram_id: str, _: dict = Depends(verify_bearer)) -> dict
         "domain": domain,
         "port": port,
         "node_name": node_name,
+        "fragment": frag_text,
     }
+
+
+@app.get("/users/{telegram_id}/client-uri")
+async def client_uri(telegram_id: str, request: Request, _: dict = Depends(verify_bearer)) -> dict[str, Any]:
+    """Готовая hysteria2:// и URL подписки HAPP (формат profile-title + subscription-userinfo)."""
+    tid = _validate_tg_id(telegram_id)
+    d = _build_hysteria2_uri_dict(tid)
+    base = str(request.base_url).rstrip("/")
+    key = _happ_subscription_key()
+    d["happ_subscription_url"] = f"{base}/sub/{tid}?k={quote(key, safe='')}" if key else None
+    d["happ_subscription_hint"] = (
+        "В HAPP: Subscriptions → + → вставьте ссылку подписки (не одну строку hysteria2)."
+        if key
+        else "Добавьте в /opt/hy2-agent/config.json поля happ_subscription_key и при желании happ { profile_title, region_label, … }"
+    )
+    return d
+
+
+@app.get("/sub/{telegram_id}")
+async def happ_subscription_export(
+    telegram_id: str,
+    _auth: dict[str, Any] = Depends(verify_sub_key_or_jwt),
+) -> Response:
+    """Текст подписки для HAPP: метаданные + hysteria2:// (см. документацию Happ)."""
+    tid = _validate_tg_id(telegram_id)
+    d = _build_hysteria2_uri_dict(tid)
+    up, down = await _user_traffic_up_down(tid)
+    tot = _subscription_total_bytes()
+    exp = _user_expire_unix(tid)
+    hc = _happ_cfg()
+    title = _trunc_happ_title(str(hc.get("profile_title") or _config.get("node_name") or "VPN"))
+    lines = [
+        f"#profile-title: {title}",
+        "#profile-update-interval: 1",
+        f"#subscription-userinfo: upload={up}; download={down}; total={tot}; expire={exp}",
+    ]
+    su = (hc.get("support_url") or "").strip()
+    if su:
+        lines.append(f"#support-url: {su}")
+    pwu = (hc.get("profile_web_page_url") or "").strip()
+    if pwu:
+        lines.append(f"#profile-web-page-url: {pwu}")
+    lines.append(d["uri"])
+    body = "\n".join(lines) + "\n"
+    info_hdr = f"upload={up}; download={down}; total={tot}; expire={exp}"
+    return Response(
+        content=body.encode("utf-8"),
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "subscription-userinfo": info_hdr,
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @app.get("/users/{telegram_id}")

@@ -247,12 +247,15 @@ export HY2_CFG_STATS_SECRET="$STATS_SECRET"
 export HY2_CFG_LOGIN="$PANEL_LOGIN"
 export HY2_CFG_PASSWORD_HASH="$PASSWORD_HASH"
 export HY2_CFG_JWT_SECRET="$JWT_SECRET"
+HAPP_SUB_KEY="$(openssl rand -hex 24)"
+export HY2_CFG_HAPP_SUB_KEY="$HAPP_SUB_KEY"
 
 info "Запись /opt/hy2-agent/config.json..."
 /opt/hy2-agent/venv/bin/python3 <<'PY'
 import json, os
+node = os.environ.get("HY2_CFG_NODE_NAME", "VPN") or "VPN"
 cfg = {
-    "node_name": os.environ["HY2_CFG_NODE_NAME"],
+    "node_name": node,
     "master_url": os.environ["HY2_CFG_MASTER_URL"],
     "token": os.environ["HY2_CFG_TOKEN"],
     "agent_port": int(os.environ.get("HY2_CFG_AGENT_PORT", "4000")),
@@ -262,12 +265,22 @@ cfg = {
     "login": os.environ["HY2_CFG_LOGIN"],
     "password_hash": os.environ["HY2_CFG_PASSWORD_HASH"],
     "jwt_secret": os.environ["HY2_CFG_JWT_SECRET"],
+    "happ_subscription_key": os.environ.get("HY2_CFG_HAPP_SUB_KEY", ""),
+    "happ": {
+        "profile_title": node[:25],
+        "region_label": "",
+        "support_url": "",
+        "profile_web_page_url": "",
+        "subscription_total_bytes": 0,
+        "default_expire_unix": 0,
+    },
+    "user_expires": {},
 }
 with open("/opt/hy2-agent/config.json", "w", encoding="utf-8") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
 PY
 
-unset HY2_CFG_NODE_NAME HY2_CFG_MASTER_URL HY2_CFG_TOKEN HY2_CFG_AGENT_PORT HY2_CFG_STATS_SECRET HY2_CFG_LOGIN HY2_CFG_PASSWORD_HASH HY2_CFG_JWT_SECRET
+unset HY2_CFG_NODE_NAME HY2_CFG_MASTER_URL HY2_CFG_TOKEN HY2_CFG_AGENT_PORT HY2_CFG_STATS_SECRET HY2_CFG_LOGIN HY2_CFG_PASSWORD_HASH HY2_CFG_JWT_SECRET HY2_CFG_HAPP_SUB_KEY
 
 info "Установка systemd: hy2-agent.service..."
 cp -f "$NODE_AGENT_SRC/hy2-agent.service" /etc/systemd/system/hy2-agent.service

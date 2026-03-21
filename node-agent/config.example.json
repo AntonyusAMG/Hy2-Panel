@@ -8,5 +8,15 @@
   "stats_secret": "REPLACE_WITH_STATS_SECRET",
   "login": "admin",
   "password_hash": "$2b$12$REPLACE_WITH_BCRYPT_HASH",
-  "jwt_secret": "REPLACE_WITH_JWT_SECRET"
+  "jwt_secret": "REPLACE_WITH_JWT_SECRET",
+  "happ_subscription_key": "REPLACE_RANDOM_HEX_FOR_HAPP_SUB_URL",
+  "happ": {
+    "profile_title": "My VPN",
+    "region_label": "🇳🇱 NL",
+    "support_url": "https://t.me/your_support",
+    "profile_web_page_url": "",
+    "subscription_total_bytes": 0,
+    "default_expire_unix": 0
+  },
+  "user_expires": {}
 }
