@@ -1,129 +1,978 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HY2 Node</title>
+  <title>Hysteria 2 — панель ноды</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" id="hljs-theme" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
   <style>
-    :root {
+    :root[data-theme="dark"] {
       --bg0: #1c2130;
       --bg1: #212736;
+      --bg2: #2a3347;
       --accent: #3f9de1;
       --txt: #cdd5e0;
       --muted: #8b98ab;
+      --green: #3dd68c;
+      --red: #ff6b6b;
+      --amber: #ffb347;
+      --border: rgba(255,255,255,0.08);
+      --shadow: rgba(0,0,0,0.35);
+      --grad-top: #243049;
+    }
+    :root[data-theme="light"] {
+      --bg0: #f0f4f8;
+      --bg1: #ffffff;
+      --bg2: #f4f7fb;
+      --accent: #2980b9;
+      --txt: #1a2333;
+      --muted: #5c6b7e;
+      --green: #16a34a;
+      --red: #dc2626;
+      --amber: #d97706;
+      --border: rgba(0,0,0,0.08);
+      --shadow: rgba(0,0,0,0.08);
+      --grad-top: #dbe7f3;
     }
     * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
     body {
-      margin: 0;
-      min-height: 100vh;
       font-family: Inter, system-ui, sans-serif;
-      background: radial-gradient(1200px 600px at 20% -10%, #243049 0%, var(--bg0) 55%);
+      background: radial-gradient(1000px 500px at 15% -5%, var(--grad-top) 0%, var(--bg0) 50%);
       color: var(--txt);
+      font-size: 15px;
+      line-height: 1.45;
+    }
+    .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.82rem; }
+    .muted { color: var(--muted); }
+    .hidden { display: none !important; }
+
+    /* Login */
+    #view-login {
+      min-height: 100vh;
       display: grid;
       place-items: center;
       padding: 24px;
     }
-    .card {
-      width: min(440px, 100%);
+    .login-card {
+      width: min(420px, 100%);
       background: var(--bg1);
-      border: 1px solid rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 28px 26px 24px;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+      padding: 28px 26px;
+      box-shadow: 0 24px 60px var(--shadow);
     }
-    h1 {
-      margin: 0 0 8px;
+    .login-card h1 {
       font-family: Syne, sans-serif;
       font-weight: 800;
+      font-size: 1.5rem;
+      margin: 0 0 8px;
       letter-spacing: -0.02em;
-      font-size: 1.55rem;
     }
-    p.lead { margin: 0 0 20px; color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
-    .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.85rem; }
-    .badge {
-      display: inline-flex;
+    .login-card .lead { color: var(--muted); font-size: 0.92rem; margin-bottom: 20px; }
+
+    /* App shell */
+    #view-app {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+    @media (max-width: 900px) {
+      #view-app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .sidebar.open { display: flex; position: fixed; inset: 0; z-index: 50; background: var(--bg0); flex-direction: column; padding: 16px; }
+    }
+
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 20px;
+      background: var(--bg1);
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar h1 {
+      font-family: Syne, sans-serif;
+      font-weight: 800;
+      font-size: 1.15rem;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge-node {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 10px;
       border-radius: 999px;
+      background: rgba(63, 157, 225, 0.15);
+      color: var(--accent);
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .btn-icon {
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--txt);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .btn-icon:hover { border-color: var(--accent); }
+    .status-pill {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+    .status-pill.ok { background: rgba(61, 214, 140, 0.15); color: var(--green); }
+    .status-pill.bad { background: rgba(255, 107, 107, 0.15); color: var(--red); }
+
+    .sidebar {
+      grid-row: 2;
+      padding: 16px 12px;
+      border-right: 1px solid var(--border);
+      background: var(--bg1);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-btn {
+      text-align: left;
+      border: 0;
+      background: transparent;
+      color: var(--txt);
+      padding: 12px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    .nav-btn:hover { background: var(--bg2); }
+    .nav-btn.active {
       background: rgba(63, 157, 225, 0.12);
       color: var(--accent);
+    }
+
+    main {
+      padding: 20px 24px 32px;
+      overflow: auto;
+    }
+    .section-title {
+      font-family: Syne, sans-serif;
+      font-weight: 700;
+      font-size: 1.25rem;
+      margin: 0 0 16px;
+    }
+
+    .grid-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .metric {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .metric label {
+      display: block;
       font-size: 0.78rem;
-      font-weight: 600;
-      margin-bottom: 18px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
     }
-    label { display: block; font-size: 0.8rem; color: var(--muted); margin: 12px 0 6px; }
-    input {
-      width: 100%;
-      padding: 12px 12px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: #1a2030;
-      color: var(--txt);
-      outline: none;
+    .metric .val { font-size: 1.35rem; font-weight: 600; font-family: Syne, sans-serif; }
+
+    .chart-wrap {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 20px;
     }
-    input:focus { border-color: rgba(63, 157, 225, 0.55); }
-    button {
-      margin-top: 18px;
+    .chart-wrap h3 { margin: 0 0 12px; font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+    .bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      height: 140px;
+      padding-top: 8px;
+    }
+    .bar-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .bar {
       width: 100%;
-      border: 0;
+      max-width: 48px;
+      border-radius: 6px 6px 2px 2px;
+      background: linear-gradient(180deg, var(--accent), #1e4a6e);
+      min-height: 4px;
+      transition: height 0.25s ease;
+    }
+    .bar-col span {
+      font-size: 0.68rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg1);
+      border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 12px 14px;
+      overflow: hidden;
+    }
+    table.data th, table.data td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    table.data th {
+      background: var(--bg2);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+    }
+    table.data tr:last-child td { border-bottom: 0; }
+
+    .progress {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--bg2);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress > i {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      border-radius: 999px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+    input.inp, select.inp {
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--txt);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.92rem;
+      min-width: 200px;
+    }
+    .btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
       font-weight: 600;
       cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .btn-primary {
       background: linear-gradient(180deg, #4aa7e8, #2f86c5);
       color: #0b1420;
     }
-    button:disabled { opacity: 0.55; cursor: not-allowed; }
-    .err { margin-top: 12px; color: #ff6b6b; font-size: 0.88rem; min-height: 1.2em; }
-    .ok { margin-top: 12px; color: #3dd68c; font-size: 0.88rem; }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-ghost {
+      background: var(--bg2);
+      color: var(--txt);
+      border: 1px solid var(--border);
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .config-pre {
+      margin: 0;
+      padding: 16px;
+      background: var(--bg2);
+      border-radius: 12px;
+      overflow: auto;
+      max-height: min(70vh, 640px);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    .config-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(255, 179, 71, 0.15);
+      color: var(--amber);
+      margin-bottom: 12px;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: grid;
+      place-items: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px;
+      width: min(420px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+    }
+    .modal h3 { margin: 0 0 14px; font-family: Syne, sans-serif; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      max-width: 360px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      box-shadow: 0 12px 40px var(--shadow);
+      z-index: 200;
+      font-size: 0.9rem;
+    }
+    .toast.err { border-color: var(--red); color: var(--red); }
+
+    .mobile-nav-btn { display: none; }
+    @media (max-width: 900px) {
+      .mobile-nav-btn { display: inline-flex; }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="badge"><span class="mono">HY2</span> node panel</div>
-    <h1>Вход в панель ноды</h1>
-    <p class="lead">Полный интерфейс будет на следующем этапе. Сейчас можно проверить логин и выдачу JWT.</p>
-    <form id="f">
-      <label for="login">Логин</label>
-      <input id="login" name="login" autocomplete="username" />
-      <label for="password">Пароль</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" />
-      <button type="submit" id="btn">Войти</button>
-      <div class="err" id="err"></div>
-      <div class="ok mono" id="ok"></div>
-    </form>
+  <div id="view-login">
+    <div class="login-card">
+      <div class="badge-node mono" style="margin-bottom:12px;display:inline-block;">HY2 node</div>
+      <h1>Вход</h1>
+      <p class="lead">Панель управления нодой Hysteria 2. Данные не уходят на сторонние серверы.</p>
+      <form id="form-login">
+        <div class="field"><label for="inp-login">Логин</label><input class="inp" id="inp-login" autocomplete="username" required /></div>
+        <div class="field"><label for="inp-pass">Пароль</label><input class="inp" id="inp-pass" type="password" autocomplete="current-password" required /></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Войти</button>
+        <p id="login-err" class="mono" style="color:var(--red);min-height:1.2em;margin-top:10px;font-size:0.88rem;"></p>
+      </form>
+    </div>
   </div>
+
+  <div id="view-app" class="hidden">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <button type="button" class="btn-icon mobile-nav-btn" id="btn-menu" aria-label="Меню">☰</button>
+        <h1>Hysteria 2 <span class="badge-node mono" id="hdr-node">—</span></h1>
+        <span class="status-pill ok mono" id="hdr-online">онлайн</span>
+        <span class="mono" style="font-size:0.78rem;color:var(--muted);" id="hdr-ver">—</span>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="btn-icon" id="btn-theme" title="Тема">Тема</button>
+        <button type="button" class="btn-icon" id="btn-logout">Выход</button>
+      </div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+      <button type="button" class="nav-btn active" data-section="overview">Обзор</button>
+      <button type="button" class="nav-btn" data-section="users">Пользователи</button>
+      <button type="button" class="nav-btn" data-section="config">Конфигурация</button>
+      <button type="button" class="nav-btn" data-section="server">Сервер</button>
+    </aside>
+
+    <main>
+      <section id="sec-overview">
+        <h2 class="section-title">Обзор</h2>
+        <div class="grid-metrics">
+          <div class="metric"><label>Пользователей</label><div class="val mono" id="m-users">—</div></div>
+          <div class="metric"><label>Трафик сегодня</label><div class="val mono" id="m-traffic">—</div></div>
+          <div class="metric"><label>Протокол</label><div class="val">QUIC / UDP</div></div>
+          <div class="metric"><label>Uptime</label><div class="val mono" id="m-uptime">—</div></div>
+        </div>
+        <div class="chart-wrap">
+          <h3>Трафик за 7 дней (снимки при открытии обзора)</h3>
+          <div class="bars" id="chart-bars"></div>
+        </div>
+        <h3 style="font-size:0.95rem;color:var(--muted);margin:0 0 10px;">Активность / сессии (по данным stats API)</h3>
+        <table class="data">
+          <thead><tr><th>Идентификатор</th><th>Tx / Rx</th><th>Примечание</th></tr></thead>
+          <tbody id="tbl-conn"></tbody>
+        </table>
+      </section>
+
+      <section id="sec-users" class="hidden">
+        <h2 class="section-title">Пользователи</h2>
+        <div class="toolbar">
+          <input type="search" class="inp" id="user-search" placeholder="Поиск по telegram_id…" />
+          <button type="button" class="btn btn-primary" id="btn-add-user">Добавить</button>
+        </div>
+        <table class="data">
+          <thead>
+            <tr>
+              <th>telegram_id</th>
+              <th>Трафик</th>
+              <th>Истекает</th>
+              <th>IP лимит</th>
+              <th>Статус</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbl-users"></tbody>
+        </table>
+      </section>
+
+      <section id="sec-config" class="hidden">
+        <h2 class="section-title">Конфигурация</h2>
+        <span class="config-badge">Только просмотр — правки через мастер-панель или API</span>
+        <pre class="config-pre mono"><code id="cfg-yaml" class="language-yaml"></code></pre>
+      </section>
+
+      <section id="sec-server" class="hidden">
+        <h2 class="section-title">Сервер</h2>
+        <div class="grid-metrics" style="margin-bottom:20px;">
+          <div class="metric"><label>CPU</label><div class="val mono" id="srv-cpu">—</div><div class="progress"><i id="srv-cpu-bar" style="width:0%"></i></div></div>
+          <div class="metric"><label>RAM</label><div class="val mono" id="srv-ram">—</div><div class="progress"><i id="srv-ram-bar" style="width:0%"></i></div></div>
+          <div class="metric"><label>Диск /</label><div class="val mono" id="srv-disk">—</div><div class="progress"><i id="srv-disk-bar" style="width:0%"></i></div></div>
+        </div>
+        <table class="data">
+          <thead><tr><th>Сервис</th><th>Состояние</th><th>Действия</th></tr></thead>
+          <tbody id="tbl-svc"></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal-user" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3>Новый пользователь</h3>
+      <div class="field"><label>telegram_id</label><input class="inp mono" id="mu-tg" inputmode="numeric" pattern="[0-9]+" placeholder="например 100356905" /></div>
+      <div class="field"><label>Пароль клиента</label><input class="inp mono" id="mu-pw" type="text" autocomplete="off" /></div>
+      <div class="field"><label>Лимит ГБ (инфо, в HY2 пока не хранится)</label><input class="inp" id="mu-gb" type="text" placeholder="—" disabled /></div>
+      <div class="field"><label>Дней (инфо)</label><input class="inp" id="mu-days" type="text" placeholder="—" disabled /></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+        <button type="button" class="btn btn-ghost" id="mu-cancel">Отмена</button>
+        <button type="button" class="btn btn-primary" id="mu-save">Создать</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/yaml.min.js"></script>
   <script>
-    const $ = (id) => document.getElementById(id);
-    $('f').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      $('err').textContent = '';
-      $('ok').textContent = '';
-      $('btn').disabled = true;
-      try {
-        const body = {
-          login: $('login').value.trim(),
-          password: $('password').value,
-        };
-        const r = await fetch('/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(j.detail || r.statusText || 'Ошибка входа');
-        localStorage.setItem('hy2_jwt', j.access_token);
-        $('ok').textContent = 'JWT сохранён в localStorage (hy2_jwt). Дальше — разделы панели.';
-      } catch (err) {
-        $('err').textContent = String(err.message || err);
-      } finally {
-        $('btn').disabled = false;
+(function () {
+  const JWT_KEY = 'hy2_jwt';
+  const THEME_KEY = 'hy2_theme';
+  const TRAFFIC_HIST_KEY = 'hy2_traffic_daily_v1';
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+  function toast(msg, isErr) {
+    const el = $('#toast');
+    el.textContent = msg;
+    el.classList.toggle('err', !!isErr);
+    el.classList.remove('hidden');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.add('hidden'), 4200);
+  }
+
+  async function api(path, opts = {}) {
+    const jwt = localStorage.getItem(JWT_KEY);
+    const headers = Object.assign({ Authorization: 'Bearer ' + jwt }, opts.headers || {});
+    if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(opts.body);
+    }
+    const r = await fetch(path, Object.assign({}, opts, { headers }));
+    const ct = r.headers.get('content-type') || '';
+    const data = ct.includes('json') ? await r.json().catch(() => ({})) : await r.text();
+    if (!r.ok) {
+      const d = typeof data === 'object' && data.detail !== undefined ? data.detail : data;
+      throw new Error(typeof d === 'string' ? d : JSON.stringify(d));
+    }
+    return data;
+  }
+
+  function formatBytes(n) {
+    if (n == null || Number.isNaN(n)) return '—';
+    const u = ['B','KB','MB','GB','TB'];
+    let v = Number(n);
+    let i = 0;
+    while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+    return (i === 0 ? v : v.toFixed(i >= 3 ? 2 : 1)) + ' ' + u[i];
+  }
+
+  function formatUptime(sec) {
+    const s = Number(sec) || 0;
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (d > 0) return d + 'д ' + h + 'ч';
+    if (h > 0) return h + 'ч ' + m + 'м';
+    return m + 'м';
+  }
+
+  /** Суммирует upload/download из вложенного объекта traffic API */
+  function sumTrafficStats(obj) {
+    let up = 0, down = 0;
+    function walk(x) {
+      if (!x || typeof x !== 'object') return;
+      if (Array.isArray(x)) { x.forEach(walk); return; }
+      if (typeof x.upload === 'number') up += x.upload;
+      if (typeof x.download === 'number') down += x.download;
+      if (typeof x.tx === 'number') up += x.tx;
+      if (typeof x.rx === 'number') down += x.rx;
+      Object.values(x).forEach((v) => {
+        if (v && typeof v === 'object' && !Array.isArray(v)) walk(v);
+      });
+    }
+    walk(obj);
+    return { up, down, total: up + down };
+  }
+
+  /** Плоский список пользователей с tx/rx если есть */
+  function perUserFromTraffic(traffic, userIds) {
+    const map = {};
+    userIds.forEach((id) => { map[id] = { up: 0, down: 0 }; });
+
+    function absorb(obj, prefix) {
+      if (!obj || typeof obj !== 'object') return;
+      if (Array.isArray(obj)) {
+        obj.forEach((row) => absorb(row, prefix));
+        return;
       }
+      const keys = Object.keys(obj);
+      keys.forEach((k) => {
+        const v = obj[k];
+        if (map[k] !== undefined && v && typeof v === 'object') {
+          if (typeof v.upload === 'number') map[k].up += v.upload;
+          if (typeof v.download === 'number') map[k].down += v.download;
+          if (typeof v.tx === 'number') map[k].up += v.tx;
+          if (typeof v.rx === 'number') map[k].down += v.rx;
+        }
+        if (v && typeof v === 'object') absorb(v, k);
+      });
+    }
+    absorb(traffic, '');
+    if (traffic && traffic.users && typeof traffic.users === 'object') {
+      Object.entries(traffic.users).forEach(([k, v]) => {
+        if (!map[k]) map[k] = { up: 0, down: 0 };
+        if (v && typeof v === 'object') {
+          if (typeof v.upload === 'number') map[k].up += v.upload;
+          if (typeof v.download === 'number') map[k].down += v.download;
+          if (typeof v.tx === 'number') map[k].up += v.tx;
+          if (typeof v.rx === 'number') map[k].down += v.rx;
+        }
+      });
+    }
+    return map;
+  }
+
+  function rowsFromTrafficForTable(traffic) {
+    const rows = [];
+    if (!traffic || typeof traffic !== 'object') {
+      rows.push({ id: '—', pair: '—', note: 'Нет ответа от stats API' });
+      return rows;
+    }
+    if (traffic.online && Array.isArray(traffic.online)) {
+      traffic.online.forEach((o) => rows.push({
+        id: String(o.id || o.user || o.telegram_id || '—'),
+        pair: [formatBytes(o.tx || o.upload), formatBytes(o.rx || o.download)].join(' / '),
+        note: 'online',
+      }));
+      if (rows.length) return rows;
+    }
+    const users = traffic.users || traffic;
+    if (users && typeof users === 'object' && !Array.isArray(users)) {
+      Object.entries(users).forEach(([id, v]) => {
+        if (v && typeof v === 'object') {
+          const up = v.upload ?? v.tx ?? 0;
+          const down = v.download ?? v.rx ?? 0;
+          rows.push({
+            id: id,
+            pair: formatBytes(up) + ' / ' + formatBytes(down),
+            note: 'накопленно',
+          });
+        }
+      });
+    }
+    if (!rows.length) {
+      rows.push({ id: '—', pair: '—', note: 'Формат stats не содержит известных полей — см. документацию HY2' });
+    }
+    return rows;
+  }
+
+  function loadTrafficHistory() {
+    try {
+      return JSON.parse(localStorage.getItem(TRAFFIC_HIST_KEY) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveTrafficHistory(arr) {
+    localStorage.setItem(TRAFFIC_HIST_KEY, JSON.stringify(arr.slice(-14)));
+  }
+
+  function todayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function pushDailyTotal(bytes) {
+    const hist = loadTrafficHistory();
+    const t = todayStr();
+    const last = hist[hist.length - 1];
+    if (last && last.d === t) last.bytes = Math.max(last.bytes || 0, bytes);
+    else hist.push({ d: t, bytes });
+    saveTrafficHistory(hist);
+  }
+
+  function renderChart() {
+    const hist = loadTrafficHistory();
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const dt = new Date();
+      dt.setDate(dt.getDate() - i);
+      days.push(dt.toISOString().slice(0, 10));
+    }
+    const byD = Object.fromEntries(hist.map((x) => [x.d, x.bytes || 0]));
+    const vals = days.map((d) => byD[d] || 0);
+    const max = Math.max(...vals, 1);
+    const root = $('#chart-bars');
+    root.innerHTML = '';
+    days.forEach((d, i) => {
+      const col = document.createElement('div');
+      col.className = 'bar-col';
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.height = Math.round((vals[i] / max) * 120) + 'px';
+      const lab = document.createElement('span');
+      lab.textContent = d.slice(5);
+      col.appendChild(bar);
+      col.appendChild(lab);
+      root.appendChild(col);
     });
+  }
+
+  let currentSection = 'overview';
+  let refreshOverview = null;
+  let refreshServer = null;
+
+  function showSection(id) {
+    currentSection = id;
+    $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.section === id));
+    ['overview', 'users', 'config', 'server'].forEach((s) => {
+      $('#sec-' + s).classList.toggle('hidden', s !== id);
+    });
+    if (refreshOverview) { clearInterval(refreshOverview); refreshOverview = null; }
+    if (refreshServer) { clearInterval(refreshServer); refreshServer = null; }
+    if (id === 'overview') {
+      loadOverview();
+      refreshOverview = setInterval(loadOverview, 30000);
+    }
+    if (id === 'users') loadUsers();
+    if (id === 'config') loadConfig();
+    if (id === 'server') {
+      loadServer();
+      refreshServer = setInterval(loadServer, 10000);
+    }
+  }
+
+  async function loadOverview() {
+    try {
+      const st = await api('/status');
+      const users = await api('/users');
+      let traffic = {};
+      try {
+        traffic = await api('/traffic');
+      } catch (e) {
+        traffic = {};
+      }
+      const ids = users.users || [];
+      $('#hdr-node').textContent = st.node_name || 'нода';
+      $('#hdr-ver').textContent = st.hysteria_version || '';
+      const hyOk = st.hysteria_active === 'active';
+      const el = $('#hdr-online');
+      el.textContent = hyOk ? 'HY2 active' : 'HY2 ' + (st.hysteria_active || '?');
+      el.className = 'status-pill mono ' + (hyOk ? 'ok' : 'bad');
+
+      $('#m-users').textContent = String(ids.length);
+      const sum = sumTrafficStats(traffic);
+      $('#m-traffic').textContent = formatBytes(sum.total);
+      $('#m-uptime').textContent = formatUptime(st.uptime_seconds);
+      pushDailyTotal(sum.total);
+      renderChart();
+
+      const tb = $('#tbl-conn');
+      tb.innerHTML = '';
+      rowsFromTrafficForTable(traffic).forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td class="mono">' + row.id + '</td><td class="mono">' + row.pair + '</td><td>' + row.note + '</td>';
+        tb.appendChild(tr);
+      });
+    } catch (e) {
+      toast(String(e.message || e), true);
+    }
+  }
+
+  async function loadUsers() {
+    try {
+      const users = await api('/users');
+      let traffic = {};
+      try { traffic = await api('/traffic'); } catch (e) {}
+      const ids = users.users || [];
+      const pmap = perUserFromTraffic(traffic, ids);
+      const q = ($('#user-search').value || '').trim().toLowerCase();
+      const tb = $('#tbl-users');
+      tb.innerHTML = '';
+      ids.filter((id) => !q || String(id).toLowerCase().includes(q)).forEach((id) => {
+        const p = pmap[id] || { up: 0, down: 0 };
+        const total = (p.up + p.down) || 0;
+        const pct = total > 0 ? Math.min(100, 12 + Math.log10(total + 1) * 8) : 0;
+        const tr = document.createElement('tr');
+        tr.dataset.telegramId = id;
+        tr.innerHTML =
+          '<td class="mono">' + id + '</td>' +
+          '<td style="min-width:140px"><div class="mono" style="font-size:0.8rem">' + formatBytes(p.up) + ' ↑ / ' + formatBytes(p.down) + ' ↓</div><div class="progress"><i style="width:' + pct + '%"></i></div></td>' +
+          '<td class="muted">—</td><td class="muted">—</td>' +
+          '<td><span class="status-pill ok">в конфиге</span></td>' +
+          '<td style="white-space:nowrap">' +
+          '<button type="button" class="btn btn-ghost" data-act="reset" data-id="' + id + '">Сброс трафика</button> ' +
+          '<button type="button" class="btn btn-danger" data-act="del" data-id="' + id + '">Удалить</button>' +
+          '</td>';
+        tb.appendChild(tr);
+      });
+      tb.querySelectorAll('button[data-act]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          if (btn.dataset.act === 'del') {
+            if (!confirm('Удалить пользователя ' + id + '?')) return;
+            try {
+              await api('/users/' + encodeURIComponent(id), { method: 'DELETE' });
+              toast('Удалено');
+              loadUsers();
+            } catch (e) { toast(String(e.message || e), true); }
+          }
+          if (btn.dataset.act === 'reset') {
+            try {
+              await api('/traffic/' + encodeURIComponent(id) + '/reset', { method: 'POST' });
+              toast('Сброс запрошен');
+              loadUsers();
+            } catch (e) {
+              toast(String(e.message || e), true);
+            }
+          }
+        });
+      });
+    } catch (e) {
+      toast(String(e.message || e), true);
+    }
+  }
+
+  async function loadConfig() {
+    try {
+      const c = await api('/config');
+      const code = $('#cfg-yaml');
+      code.textContent = c.content || '';
+      code.className = 'language-yaml';
+      if (window.hljs) hljs.highlightElement(code);
+    } catch (e) {
+      toast(String(e.message || e), true);
+    }
+  }
+
+  async function loadServer() {
+    try {
+      const st = await api('/status');
+      $('#srv-cpu').textContent = (st.cpu_percent != null ? st.cpu_percent.toFixed(0) : '—') + '%';
+      $('#srv-cpu-bar').style.width = Math.min(100, st.cpu_percent || 0) + '%';
+      const mem = st.memory || {};
+      $('#srv-ram').textContent = formatBytes(mem.used) + ' / ' + formatBytes(mem.total);
+      $('#srv-ram-bar').style.width = Math.min(100, mem.percent || 0) + '%';
+      const dk = st.disk || {};
+      $('#srv-disk').textContent = formatBytes(dk.used) + ' / ' + formatBytes(dk.total);
+      $('#srv-disk-bar').style.width = Math.min(100, dk.percent || 0) + '%';
+
+      const tb = $('#tbl-svc');
+      tb.innerHTML = '';
+
+      function row(name, active, svcKey) {
+        const ok = active === 'active';
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td class="mono">' + name + '</td>' +
+          '<td><span class="status-pill ' + (ok ? 'ok' : 'bad') + '">' + active + '</span></td>' +
+          '<td>' +
+          '<button type="button" class="btn btn-ghost" data-svc="' + svcKey + '" data-a="restart">Restart</button> ' +
+          '<button type="button" class="btn btn-ghost" data-svc="' + svcKey + '" data-a="stop">Stop</button> ' +
+          '<button type="button" class="btn btn-ghost" data-svc="' + svcKey + '" data-a="start">Start</button>' +
+          '</td>';
+        tb.appendChild(tr);
+        tr.querySelectorAll('button[data-svc]').forEach((b) => {
+          b.addEventListener('click', async () => {
+            const svc = b.dataset.svc;
+            const a = b.dataset.a;
+            const path = svc === 'hy2-agent'
+              ? '/service/node-agent/' + a
+              : '/service/' + a;
+            try {
+              await api(path, { method: 'POST' });
+              toast('OK: ' + name + ' ' + a);
+              loadServer();
+            } catch (e) { toast(String(e.message || e), true); }
+          });
+        });
+      }
+
+      row(st.hysteria_service || 'hysteria-server', st.hysteria_active, 'hysteria');
+      row('hy2-agent', st.hy2_agent_active, 'hy2-agent');
+    } catch (e) {
+      toast(String(e.message || e), true);
+    }
+  }
+
+  function applyHljsTheme() {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const link = document.getElementById('hljs-theme');
+    if (link) {
+      link.href = dark
+        ? 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css'
+        : 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css';
+    }
+  }
+
+  function setTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem(THEME_KEY, t);
+    applyHljsTheme();
+    if ($('#cfg-yaml') && $('#cfg-yaml').textContent && window.hljs) {
+      hljs.highlightElement($('#cfg-yaml'));
+    }
+  }
+
+  function showApp(show) {
+    $('#view-login').classList.toggle('hidden', show);
+    $('#view-app').classList.toggle('hidden', !show);
+  }
+
+  function logout() {
+    localStorage.removeItem(JWT_KEY);
+    showApp(false);
+  }
+
+  $('#form-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('#login-err').textContent = '';
+    try {
+      const r = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          login: $('#inp-login').value.trim(),
+          password: $('#inp-pass').value,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || 'Ошибка входа');
+      localStorage.setItem(JWT_KEY, j.access_token);
+      showApp(true);
+      showSection('overview');
+    } catch (err) {
+      $('#login-err').textContent = err.message || String(err);
+    }
+  });
+
+  $('#btn-logout').addEventListener('click', logout);
+
+  $('#btn-theme').addEventListener('click', () => {
+    const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    setTheme(t);
+  });
+
+  $('#btn-menu').addEventListener('click', () => {
+    $('#sidebar').classList.toggle('open');
+  });
+
+  $$('.nav-btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      showSection(b.dataset.section);
+      $('#sidebar').classList.remove('open');
+    });
+  });
+
+  $('#user-search').addEventListener('input', () => {
+    if (currentSection === 'users') loadUsers();
+  });
+
+  $('#btn-add-user').addEventListener('click', () => {
+    $('#mu-tg').value = '';
+    $('#mu-pw').value = '';
+    $('#modal-user').classList.remove('hidden');
+  });
+  $('#mu-cancel').addEventListener('click', () => $('#modal-user').classList.add('hidden'));
+  $('#mu-save').addEventListener('click', async () => {
+    const telegram_id = $('#mu-tg').value.trim();
+    const password = $('#mu-pw').value;
+    if (!/^\d{1,32}$/.test(telegram_id)) {
+      toast('telegram_id — только цифры', true);
+      return;
+    }
+    if (!password) {
+      toast('Укажите пароль', true);
+      return;
+    }
+    try {
+      await api('/users', { method: 'POST', body: { telegram_id, password } });
+      toast('Пользователь добавлен');
+      $('#modal-user').classList.add('hidden');
+      loadUsers();
+    } catch (e) {
+      toast(String(e.message || e), true);
+    }
+  });
+
+  /* Init */
+  (function initTheme() {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'light' || saved === 'dark') setTheme(saved);
+    else setTheme('dark');
+  })();
+
+  if (localStorage.getItem(JWT_KEY)) {
+    showApp(true);
+    showSection('overview');
+  } else {
+    showApp(false);
+  }
+})();
   </script>
 </body>
 </html>

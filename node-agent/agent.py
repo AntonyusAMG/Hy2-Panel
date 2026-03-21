@@ -146,20 +146,42 @@ async def _stats_request(method: str, url_path: str, content: bytes | None = Non
         return {"raw": r.text}
 
 
-@app.get("/status")
-async def status(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
-    hysteria_active = subprocess.run(
-        ["systemctl", "is-active", _hysteria_service()],
+def _systemctl_is_active(unit: str) -> str:
+    return subprocess.run(
+        ["systemctl", "is-active", unit],
         capture_output=True,
         text=True,
     ).stdout.strip()
+
+
+def _hysteria_version_line() -> str:
+    try:
+        p = subprocess.run(
+            ["hysteria", "version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        line = (p.stdout or p.stderr or "").strip().splitlines()
+        return line[0].strip() if line else "unknown"
+    except Exception:
+        return "unknown"
+
+
+@app.get("/status")
+async def status(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
+    hysteria_active = _systemctl_is_active(_hysteria_service())
+    hy2_agent_active = _systemctl_is_active("hy2-agent")
     boot = psutil.boot_time()
     uptime_s = int(time.time() - boot)
     vm = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
     return {
+        "node_name": str(_config.get("node_name", "")),
         "hysteria_service": _hysteria_service(),
         "hysteria_active": hysteria_active,
+        "hysteria_version": _hysteria_version_line(),
+        "hy2_agent_active": hy2_agent_active,
         "cpu_percent": psutil.cpu_percent(interval=None),
         "memory": {
             "total": vm.total,
@@ -291,6 +313,18 @@ async def put_config(body: ConfigPut, _: dict = Depends(verify_bearer)) -> dict[
     path.write_text(body.content, encoding="utf-8")
     await asyncio.to_thread(_restart_hysteria)
     return {"ok": True}
+
+
+@app.post("/service/node-agent/{action}")
+async def service_node_agent(action: str, _: dict = Depends(verify_bearer)) -> dict[str, Any]:
+    """Управление systemd-юнитом hy2-agent (должен быть выше /service/{action})."""
+    if action not in ("start", "stop", "restart"):
+        raise HTTPException(status_code=400, detail="action must be start|stop|restart")
+    try:
+        subprocess.run(["systemctl", action, "hy2-agent"], check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=e.stderr or str(e)) from e
+    return {"ok": True, "service": "hy2-agent", "action": action}
 
 
 @app.post("/service/{action}")
