@@ -180,6 +180,9 @@ fi
 STATS_SECRET="$(openssl rand -hex 32)"
 JWT_SECRET="$(openssl rand -hex 32)"
 ACME_STORAGE_DIR="/var/lib/hysteria/acme"
+# HY2 ≥2.7 не принимает пустой userpass — временный пользователь, удалите в панели после добавления своих
+HY2_PLACEHOLDER_TG="${HY2_PLACEHOLDER_TG:-999999999}"
+PLACEHOLDER_USERPASS="$(openssl rand -hex 16)"
 
 info "Создание каталогов..."
 mkdir -p /etc/hysteria /opt/hy2-agent/ui /var/log/hy2-agent "$ACME_STORAGE_DIR"
@@ -204,7 +207,8 @@ acme:
 
 auth:
   type: userpass
-  userpass: {}
+  userpass:
+    "${HY2_PLACEHOLDER_TG}": "${PLACEHOLDER_USERPASS}"
 
 masquerade:
   type: proxy
@@ -333,6 +337,7 @@ echo ""
 info "TLS / Let's Encrypt: встроенный ACME Hysteria 2 (CA: ${ACME_CA}, challenge: tls / TLS-ALPN на :443)."
 info "Продление сертификата выполняет сам hysteria-server; отдельный certbot и cron не нужны."
 info "Каталог ACME:   ${ACME_STORAGE_DIR}"
+warn "Временный userpass в ${HY2_PLACEHOLDER_TG} — удалите в панели после добавления реальных пользователей (HY2 не принимает пустой userpass)."
 echo ""
 systemctl --no-pager -l status hysteria-server.service || true
 echo ""
