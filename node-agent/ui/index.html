@@ -1030,6 +1030,22 @@
     }
   }
 
+  /** Ответ GET /traffic иногда обёрнут или приходит в виде вложенного объекта. */
+  function normalizeTrafficPayload(t) {
+    if (t == null || typeof t !== 'object' || Array.isArray(t)) return t;
+    if (t.users && typeof t.users === 'object' && !Array.isArray(t.users)) return t;
+    if (typeof t.data === 'object' && t.data !== null && !Array.isArray(t.data)) return t.data;
+    return t;
+  }
+
+  function onlineCountForUser(byUser, id) {
+    const s = String(id);
+    if (!byUser || typeof byUser !== 'object') return 0;
+    const n = byUser[s] != null ? byUser[s] : byUser[id];
+    const v = typeof n === 'number' ? n : parseInt(String(n), 10);
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  }
+
   function touchLastRefresh() {
     const el = $('#hdr-last-refresh');
     if (!el) return;
@@ -1043,7 +1059,9 @@
 
   function perUserFromTraffic(traffic, userIds) {
     const map = {};
-    userIds.forEach((id) => { map[id] = { up: 0, down: 0 }; });
+    userIds.forEach((id) => {
+      map[String(id)] = { up: 0, down: 0 };
+    });
 
     function absorb(obj, prefix) {
       if (!obj || typeof obj !== 'object') return;
@@ -1054,11 +1072,12 @@
       const keys = Object.keys(obj);
       keys.forEach((k) => {
         const v = obj[k];
-        if (map[k] !== undefined && v && typeof v === 'object') {
-          if (typeof v.upload === 'number') map[k].up += v.upload;
-          if (typeof v.download === 'number') map[k].down += v.download;
-          if (typeof v.tx === 'number') map[k].up += v.tx;
-          if (typeof v.rx === 'number') map[k].down += v.rx;
+        const km = map[k] !== undefined ? k : map[String(k)] !== undefined ? String(k) : null;
+        if (km !== null && v && typeof v === 'object') {
+          if (typeof v.upload === 'number') map[km].up += v.upload;
+          if (typeof v.download === 'number') map[km].down += v.download;
+          if (typeof v.tx === 'number') map[km].up += v.tx;
+          if (typeof v.rx === 'number') map[km].down += v.rx;
         }
         if (v && typeof v === 'object') absorb(v, k);
       });
@@ -1066,12 +1085,13 @@
     absorb(traffic, '');
     if (traffic && traffic.users && typeof traffic.users === 'object') {
       Object.entries(traffic.users).forEach(([k, v]) => {
-        if (!map[k]) map[k] = { up: 0, down: 0 };
+        const ks = String(k);
+        if (!map[ks]) map[ks] = { up: 0, down: 0 };
         if (v && typeof v === 'object') {
-          if (typeof v.upload === 'number') map[k].up += v.upload;
-          if (typeof v.download === 'number') map[k].down += v.download;
-          if (typeof v.tx === 'number') map[k].up += v.tx;
-          if (typeof v.rx === 'number') map[k].down += v.rx;
+          if (typeof v.upload === 'number') map[ks].up += v.upload;
+          if (typeof v.download === 'number') map[ks].down += v.download;
+          if (typeof v.tx === 'number') map[ks].up += v.tx;
+          if (typeof v.rx === 'number') map[ks].down += v.rx;
         }
       });
     }
@@ -1223,7 +1243,7 @@
       const users = await api('/users');
       let traffic = {};
       try {
-        traffic = await api('/traffic');
+        traffic = normalizeTrafficPayload(await api('/traffic'));
       } catch (e) {
         traffic = {};
       }
@@ -1270,7 +1290,11 @@
     try {
       const users = await api('/users');
       let traffic = {};
-      try { traffic = await api('/traffic'); } catch (e) {}
+      try {
+        traffic = normalizeTrafficPayload(await api('/traffic'));
+      } catch (e) {
+        traffic = {};
+      }
       const onlineRaw = await fetchOnlineMap();
       const onl = summarizeOnline(onlineRaw);
       const sumEl = $('#users-online-summary');
@@ -1283,10 +1307,10 @@
       const tb = $('#tbl-users');
       tb.innerHTML = '';
       ids.filter((id) => !q || String(id).toLowerCase().includes(q)).forEach((id) => {
-        const p = pmap[id] || { up: 0, down: 0 };
+        const p = pmap[String(id)] || pmap[id] || { up: 0, down: 0 };
         const total = (p.up + p.down) || 0;
         const pct = total > 0 ? Math.min(100, 12 + Math.log10(total + 1) * 8) : 0;
-        const oc = onl.byUser[id] || 0;
+        const oc = onlineCountForUser(onl.byUser, id);
         let statusHtml;
         if (oc > 0) {
           statusHtml =

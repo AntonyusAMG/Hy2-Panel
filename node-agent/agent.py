@@ -129,14 +129,36 @@ def _restart_hysteria() -> None:
     )
 
 
+def _stats_authorization_headers() -> dict[str, str]:
+    """Hysteria 2 Traffic Stats API: заголовок `Authorization: <secret>` без префикса Bearer."""
+    sec = str(_stats_secret() or "").strip()
+    if not sec:
+        return {}
+    return {"Authorization": sec}
+
+
 async def _stats_request(method: str, url_path: str, content: bytes | None = None) -> Any:
     base = "http://127.0.0.1:25413"
-    headers = {"Authorization": f"Bearer {_stats_secret()}"}
+    headers = _stats_authorization_headers()
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.request(method, f"{base}{url_path}", headers=headers, content=content)
     except httpx.HTTPError as e:
         raise HTTPException(status_code=503, detail=f"Stats API unreachable: {e}") from e
+    # Некоторые сборки могут ожидать Bearer — повторяем запрос
+    if r.status_code == 401 and headers:
+        sec = str(_stats_secret() or "").strip()
+        if sec:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    r = await client.request(
+                        method,
+                        f"{base}{url_path}",
+                        headers={"Authorization": f"Bearer {sec}"},
+                        content=content,
+                    )
+            except httpx.HTTPError as e:
+                raise HTTPException(status_code=503, detail=f"Stats API unreachable: {e}") from e
     if r.status_code >= 400:
         raise HTTPException(status_code=502, detail=f"Stats API error: {r.status_code} {r.text[:200]}")
     if not r.content:
@@ -346,7 +368,7 @@ async def traffic_reset(telegram_id: str, _: dict = Depends(verify_bearer)) -> d
             async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.post(
                     f"http://127.0.0.1:25413{path}",
-                    headers={"Authorization": f"Bearer {_stats_secret()}"},
+                    headers=_stats_authorization_headers(),
                 )
             if r.status_code < 400:
                 return {"ok": True, "path": path, "response": r.text[:500]}
