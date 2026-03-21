@@ -62,6 +62,12 @@ usage() {
   NODE_NAME   — отображаемое имя ноды
   DOMAIN      — домен для ACME (A-запись на этот сервер)
 
+Переменные окружения (опционально):
+  ACME_EMAIL  — email для Let's Encrypt / ZeroSSL (если не задан — спросит интерактивно)
+  ACME_CA     — letsencrypt (по умолчанию) или zerossl
+
+Сертификаты: Hysteria 2 сам получает и продлевает TLS (встроенный ACME). Отдельный certbot не нужен.
+
 Нелокальные копии agent/ui берутся из: ${NODE_AGENT_SRC}
 EOF
 }
@@ -102,6 +108,16 @@ info "Домен:      $DOMAIN"
 info "Порт агента: $AGENT_PORT"
 echo ""
 
+ACME_CA="${ACME_CA:-letsencrypt}"
+[[ "$ACME_CA" == "letsencrypt" || "$ACME_CA" == "zerossl" ]] || die "ACME_CA должен быть letsencrypt или zerossl (сейчас: $ACME_CA)"
+
+if [[ -n "${ACME_EMAIL:-}" ]]; then
+  info "ACME email: $ACME_EMAIL (из окружения ACME_EMAIL)"
+else
+  read -r -p "Email для Let's Encrypt / ${ACME_CA} (уведомления CA): " ACME_EMAIL
+  [[ "$ACME_EMAIL" == *"@"* ]] || die "Нужен корректный email для ACME"
+fi
+
 if [[ -n "${HY2_PANEL_LOGIN:-}" && -n "${HY2_PANEL_PASSWORD:-}" ]]; then
   PANEL_LOGIN="$HY2_PANEL_LOGIN"
   PANEL_PASSWORD="$HY2_PANEL_PASSWORD"
@@ -132,7 +148,19 @@ info "Обновление установленных пакетов (может
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
 
 info "Установка зависимостей..."
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl python3 python3-pip python3-venv ufw git openssl
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl python3 python3-pip python3-venv ufw git openssl dnsutils
+
+info "Проверка DNS для ACME (A-запись должна указывать на этот сервер)..."
+RRS="$(dig +short A "$DOMAIN" 2>/dev/null | head -n1)"
+if [[ -z "$RRS" ]]; then
+  warn "Для ${DOMAIN} нет A-записи или DNS ещё не обновился — выпуск сертификата может не пройти."
+else
+  info "DNS A ${DOMAIN} → ${RRS}"
+  PUB_IP_PRE="$(curl -fsSL --connect-timeout 10 https://ipinfo.io/ip 2>/dev/null || true)"
+  if [[ -n "$PUB_IP_PRE" && "$RRS" != "$PUB_IP_PRE" ]]; then
+    warn "Публичный IP сервера (${PUB_IP_PRE}) не совпадает с A-записью (${RRS}). Для Let's Encrypt они должны совпадать."
+  fi
+fi
 
 info "Версии:"
 python3 --version
@@ -151,12 +179,12 @@ fi
 
 STATS_SECRET="$(openssl rand -hex 32)"
 JWT_SECRET="$(openssl rand -hex 32)"
-ACME_EMAIL="${ACME_EMAIL:-admin@${DOMAIN}}"
+ACME_STORAGE_DIR="/var/lib/hysteria/acme"
 
 info "Создание каталогов..."
-mkdir -p /etc/hysteria /opt/hy2-agent/ui /var/log/hy2-agent
+mkdir -p /etc/hysteria /opt/hy2-agent/ui /var/log/hy2-agent "$ACME_STORAGE_DIR"
 
-info "Запись /etc/hysteria/config.yaml..."
+info "Запись /etc/hysteria/config.yaml (встроенный ACME: ${ACME_CA}, challenge TLS-ALPN)..."
 cat > /etc/hysteria/config.yaml <<YAML
 listen: :443
 
@@ -164,6 +192,9 @@ acme:
   domains:
     - ${DOMAIN}
   email: ${ACME_EMAIL}
+  ca: ${ACME_CA}
+  type: tls
+  dir: ${ACME_STORAGE_DIR}
 
 auth:
   type: userpass
@@ -292,6 +323,10 @@ info "Публичный IP:   $PUBLIC_IP"
 info "Агент:          http://${PUBLIC_IP}:${AGENT_PORT}/status  (Bearer TOKEN)"
 info "Веб-панель UI:  http://${PUBLIC_IP}:${AGENT_PORT}/ui"
 info "Логин панели:   $PANEL_LOGIN"
+echo ""
+info "TLS / Let's Encrypt: встроенный ACME Hysteria 2 (CA: ${ACME_CA}, challenge: tls / TLS-ALPN на :443)."
+info "Продление сертификата выполняет сам hysteria-server; отдельный certbot и cron не нужны."
+info "Каталог ACME:   ${ACME_STORAGE_DIR}"
 echo ""
 systemctl --no-pager -l status hysteria-server.service || true
 echo ""

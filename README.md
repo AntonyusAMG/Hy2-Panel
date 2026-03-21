@@ -25,6 +25,10 @@ hy2-panel/
 sudo bash ./scripts/install.sh "https://ВАШ_МАСТЕР" "$(openssl rand -hex 32)" "ИМЯ_НОДЫ" "vpn.ваш-домен.ru"
 ```
 
+Скрипт спросит **email для ACME** (Let's Encrypt / ZeroSSL). Можно задать заранее: `export ACME_EMAIL=you@mail.com`. По умолчанию `ACME_CA=letsencrypt`.
+
+**Сертификаты:** Hysteria 2 получает и **автоматически продлевает** TLS через встроенный ACME (`acme` в `config.yaml`). Отдельная установка **certbot** не требуется и обычно не нужна.
+
 Файлы `agent.py`, `requirements.txt` и `ui/` копируются из каталога `node-agent/` рядом со скриптом. Для неинтерактивного ввода логина/пароля панели:
 
 ```bash
