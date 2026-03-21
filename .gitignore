@@ -1,0 +1,11 @@
+.env
+config.json
+*.key
+*.pem
+__pycache__/
+*.pyc
+node_modules/
+*.log
+.venv/
+venv/
+/opt/hy2-agent/venv/

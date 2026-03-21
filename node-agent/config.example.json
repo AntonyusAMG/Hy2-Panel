@@ -1,0 +1,12 @@
+{
+  "node_name": "FI-01 Helsinki",
+  "master_url": "https://master.example.com",
+  "token": "REPLACE_WITH_OPENSSL_RAND_HEX_32",
+  "agent_port": 4000,
+  "hysteria_config": "/etc/hysteria/config.yaml",
+  "hysteria_service": "hysteria-server",
+  "stats_secret": "REPLACE_WITH_STATS_SECRET",
+  "login": "admin",
+  "password_hash": "$2b$12$REPLACE_WITH_BCRYPT_HASH",
+  "jwt_secret": "REPLACE_WITH_JWT_SECRET"
+}
