@@ -317,6 +317,12 @@ async def traffic_all(_: dict = Depends(verify_bearer)) -> Any:
     return await _stats_request("GET", "/traffic")
 
 
+@app.get("/online")
+async def online_stats(_: dict = Depends(verify_bearer)) -> Any:
+    """Прокси к встроенному HY2 Traffic Stats API: карта user_id → число подключений (клиентов)."""
+    return await _stats_request("GET", "/online")
+
+
 @app.get("/traffic/{telegram_id}")
 async def traffic_one(telegram_id: str, _: dict = Depends(verify_bearer)) -> Any:
     tid = _validate_tg_id(telegram_id)

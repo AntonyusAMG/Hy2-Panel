@@ -435,6 +435,48 @@
       background: linear-gradient(135deg, rgba(167,139,250,0.2), rgba(167,139,250,0.06));
     }
     .topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .auto-refresh-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg2) 75%, transparent);
+      font-size: 0.78rem;
+    }
+    .auto-refresh-toolbar label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .auto-refresh-toolbar select {
+      border: 1px solid var(--border);
+      background: var(--bg1);
+      color: var(--txt);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      cursor: pointer;
+      max-width: 100px;
+    }
+    #hdr-last-refresh {
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: nowrap;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #hdr-last-refresh.flash {
+      color: var(--accent2);
+    }
     .btn-icon {
       border: 1px solid var(--border);
       background: var(--bg2);
@@ -766,6 +808,17 @@
         <span class="mono" style="font-size:0.74rem;color:var(--muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="hdr-ver">—</span>
       </div>
       <div class="topbar-actions">
+        <div class="auto-refresh-toolbar" title="Автообновление данных текущего раздела (Обзор / Пользователи / Сервер)">
+          <label><input type="checkbox" id="auto-refresh-on" /> Авто</label>
+          <select id="auto-refresh-interval" aria-label="Интервал автообновления">
+            <option value="5">5 сек</option>
+            <option value="10">10 сек</option>
+            <option value="30">30 сек</option>
+            <option value="60">60 сек</option>
+          </select>
+          <span id="hdr-last-refresh" class="mono">—</span>
+        </div>
+        <button type="button" class="btn-icon" id="btn-refresh-now" title="Обновить сейчас">↻</button>
         <button type="button" class="btn-icon" id="btn-theme" title="Сменить тему">Тема</button>
         <button type="button" class="btn-icon" id="btn-logout">Выход</button>
       </div>
@@ -786,7 +839,8 @@
       <section id="sec-overview">
         <h2 class="section-title">Обзор</h2>
         <div class="grid-metrics">
-          <div class="metric"><label>Пользователей</label><div class="val mono" id="m-users">—</div></div>
+          <div class="metric"><label>В конфиге</label><div class="val mono" id="m-users">—</div></div>
+          <div class="metric"><label>Онлайн (HY2)</label><div class="val mono" id="m-online">—</div><div class="muted" style="font-size:0.72rem;margin-top:6px;line-height:1.35" id="m-online-sub">пользователей / подключений</div></div>
           <div class="metric"><label>Трафик сегодня</label><div class="val mono" id="m-traffic">—</div></div>
           <div class="metric"><label>Протокол</label><div class="val">QUIC / UDP</div></div>
           <div class="metric"><label>Uptime</label><div class="val mono" id="m-uptime">—</div></div>
@@ -805,6 +859,7 @@
       <section id="sec-users" class="hidden">
         <h2 class="section-title">Пользователи</h2>
         <div class="toolbar">
+          <span class="mono" id="users-online-summary" style="font-size:0.82rem;color:var(--muted);padding:6px 0;">Онлайн: —</span>
           <input type="search" class="inp" id="user-search" placeholder="Поиск по telegram_id…" />
           <button type="button" class="btn btn-primary" id="btn-add-user">Добавить</button>
         </div>
@@ -881,6 +936,8 @@
   const JWT_KEY = 'hy2_jwt';
   const THEME_KEY = 'hy2_theme';
   const TRAFFIC_HIST_KEY = 'hy2_traffic_daily_v1';
+  const AUTO_REFRESH_KEY = 'hy2_auto_refresh';
+  const AUTO_INTERVAL_KEY = 'hy2_refresh_interval_sec';
   const THEMES = ['tg-dark', 'crm-soft', 'light', 'accent-violet'];
   const THEME_LABELS = { 'tg-dark': 'TG Dark', 'crm-soft': 'CRM soft', 'light': 'Светлая', 'accent-violet': 'Violet' };
 
@@ -947,6 +1004,41 @@
     }
     walk(obj);
     return { up, down, total: up + down };
+  }
+
+  function summarizeOnline(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { userCount: 0, connCount: 0, byUser: {} };
+    let connCount = 0;
+    const byUser = {};
+    Object.entries(raw).forEach(([k, v]) => {
+      const n = typeof v === 'number' ? v : parseInt(String(v), 10);
+      const c = Number.isFinite(n) && n > 0 ? n : 0;
+      if (c > 0) {
+        byUser[k] = c;
+        connCount += c;
+      }
+    });
+    return { userCount: Object.keys(byUser).length, connCount, byUser };
+  }
+
+  async function fetchOnlineMap() {
+    try {
+      const d = await api('/online');
+      return d && typeof d === 'object' && !Array.isArray(d) ? d : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function touchLastRefresh() {
+    const el = $('#hdr-last-refresh');
+    if (!el) return;
+    el.textContent = 'Обновлено ' + new Date().toLocaleTimeString();
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+    clearTimeout(touchLastRefresh._t);
+    touchLastRefresh._t = setTimeout(() => el.classList.remove('flash'), 450);
   }
 
   function perUserFromTraffic(traffic, userIds) {
@@ -1073,8 +1165,35 @@
   }
 
   let currentSection = 'overview';
-  let refreshOverview = null;
-  let refreshServer = null;
+  let sectionRefreshTimer = null;
+
+  function clearSectionRefresh() {
+    if (sectionRefreshTimer) {
+      clearInterval(sectionRefreshTimer);
+      sectionRefreshTimer = null;
+    }
+  }
+
+  function scheduleSectionRefresh() {
+    clearSectionRefresh();
+    const on = $('#auto-refresh-on');
+    if (!on || !on.checked) return;
+    if (currentSection !== 'overview' && currentSection !== 'users' && currentSection !== 'server') return;
+    const sec = Math.max(3, parseInt($('#auto-refresh-interval').value, 10) || 5);
+    const ms = sec * 1000;
+    sectionRefreshTimer = setInterval(() => {
+      if (currentSection === 'overview') loadOverview(true);
+      else if (currentSection === 'users') loadUsers(true);
+      else if (currentSection === 'server') loadServer(true);
+    }, ms);
+  }
+
+  function loadCurrentSection() {
+    if (currentSection === 'overview') return loadOverview();
+    if (currentSection === 'users') return loadUsers();
+    if (currentSection === 'config') return loadConfig();
+    if (currentSection === 'server') return loadServer();
+  }
 
   function showSection(id) {
     currentSection = id;
@@ -1082,18 +1201,12 @@
     ['overview', 'users', 'config', 'server'].forEach((s) => {
       $('#sec-' + s).classList.toggle('hidden', s !== id);
     });
-    if (refreshOverview) { clearInterval(refreshOverview); refreshOverview = null; }
-    if (refreshServer) { clearInterval(refreshServer); refreshServer = null; }
-    if (id === 'overview') {
-      loadOverview();
-      refreshOverview = setInterval(loadOverview, 30000);
-    }
+    clearSectionRefresh();
+    if (id === 'overview') loadOverview();
     if (id === 'users') loadUsers();
     if (id === 'config') loadConfig();
-    if (id === 'server') {
-      loadServer();
-      refreshServer = setInterval(loadServer, 10000);
-    }
+    if (id === 'server') loadServer();
+    scheduleSectionRefresh();
   }
 
   function cleanHysteriaVersion(s) {
@@ -1104,7 +1217,7 @@
     return lines[0].slice(0, 80);
   }
 
-  async function loadOverview() {
+  async function loadOverview(silent) {
     try {
       const st = await api('/status');
       const users = await api('/users');
@@ -1114,6 +1227,8 @@
       } catch (e) {
         traffic = {};
       }
+      const onlineRaw = await fetchOnlineMap();
+      const onl = summarizeOnline(onlineRaw);
       const ids = users.users || [];
       $('#hdr-node').textContent = st.node_name || 'нода';
       $('#hdr-ver').textContent = cleanHysteriaVersion(st.hysteria_version);
@@ -1123,6 +1238,15 @@
       el.className = 'status-pill mono ' + (hyOk ? 'ok' : 'bad');
 
       $('#m-users').textContent = String(ids.length);
+      const mo = $('#m-online');
+      const ms = $('#m-online-sub');
+      if (onl.userCount > 0 || onl.connCount > 0) {
+        mo.textContent = String(onl.userCount);
+        if (ms) ms.textContent = onl.connCount + ' подключ. (экземпляров клиента)';
+      } else {
+        mo.textContent = '0';
+        if (ms) ms.textContent = 'нет активных сессий';
+      }
       const sum = sumTrafficStats(traffic);
       $('#m-traffic').textContent = formatBytes(sum.total);
       $('#m-uptime').textContent = formatUptime(st.uptime_seconds);
@@ -1136,16 +1260,23 @@
         tr.innerHTML = '<td class="mono">' + row.id + '</td><td class="mono">' + row.pair + '</td><td>' + row.note + '</td>';
         tb.appendChild(tr);
       });
+      touchLastRefresh();
     } catch (e) {
-      toast(String(e.message || e), true);
+      if (!silent) toast(String(e.message || e), true);
     }
   }
 
-  async function loadUsers() {
+  async function loadUsers(silent) {
     try {
       const users = await api('/users');
       let traffic = {};
       try { traffic = await api('/traffic'); } catch (e) {}
+      const onlineRaw = await fetchOnlineMap();
+      const onl = summarizeOnline(onlineRaw);
+      const sumEl = $('#users-online-summary');
+      if (sumEl) {
+        sumEl.textContent = 'Онлайн: ' + onl.userCount + ' польз. · ' + onl.connCount + ' подкл.';
+      }
       const ids = users.users || [];
       const pmap = perUserFromTraffic(traffic, ids);
       const q = ($('#user-search').value || '').trim().toLowerCase();
@@ -1155,13 +1286,23 @@
         const p = pmap[id] || { up: 0, down: 0 };
         const total = (p.up + p.down) || 0;
         const pct = total > 0 ? Math.min(100, 12 + Math.log10(total + 1) * 8) : 0;
+        const oc = onl.byUser[id] || 0;
+        let statusHtml;
+        if (oc > 0) {
+          statusHtml =
+            '<span class="status-pill ok">онлайн' +
+            (oc > 1 ? ' (' + oc + ')' : '') +
+            '</span>';
+        } else {
+          statusHtml = '<span class="status-pill bad" style="opacity:0.85">офлайн</span>';
+        }
         const tr = document.createElement('tr');
         tr.dataset.telegramId = id;
         tr.innerHTML =
           '<td class="mono">' + id + '</td>' +
           '<td style="min-width:140px"><div class="mono" style="font-size:0.8rem">' + formatBytes(p.up) + ' ↑ / ' + formatBytes(p.down) + ' ↓</div><div class="progress"><i style="width:' + pct + '%"></i></div></td>' +
           '<td class="muted">—</td><td class="muted">—</td>' +
-          '<td><span class="status-pill ok">в конфиге</span></td>' +
+          '<td>' + statusHtml + '</td>' +
           '<td style="white-space:nowrap">' +
           '<button type="button" class="btn btn-ghost" data-act="link" data-id="' + id + '">Ссылка</button> ' +
           '<button type="button" class="btn btn-ghost" data-act="reset" data-id="' + id + '">Сброс</button> ' +
@@ -1200,8 +1341,9 @@
           }
         });
       });
+      touchLastRefresh();
     } catch (e) {
-      toast(String(e.message || e), true);
+      if (!silent) toast(String(e.message || e), true);
     }
   }
 
@@ -1217,7 +1359,7 @@
     }
   }
 
-  async function loadServer() {
+  async function loadServer(silent) {
     try {
       const st = await api('/status');
       $('#srv-cpu').textContent = (st.cpu_percent != null ? st.cpu_percent.toFixed(0) : '—') + '%';
@@ -1262,8 +1404,9 @@
 
       row(st.hysteria_service || 'hysteria-server', st.hysteria_active, 'hysteria');
       row('hy2-agent', st.hy2_agent_active, 'hy2-agent');
+      touchLastRefresh();
     } catch (e) {
-      toast(String(e.message || e), true);
+      if (!silent) toast(String(e.message || e), true);
     }
   }
 
@@ -1443,6 +1586,32 @@
       else saved = 'tg-dark';
     }
     setTheme(saved);
+  })();
+
+  (function initAutoRefreshControls() {
+    const cb = $('#auto-refresh-on');
+    const sel = $('#auto-refresh-interval');
+    const btn = $('#btn-refresh-now');
+    if (sel) {
+      const sec = localStorage.getItem(AUTO_INTERVAL_KEY);
+      if (sec && ['5', '10', '30', '60'].indexOf(sec) >= 0) sel.value = sec;
+      else sel.value = '5';
+    }
+    if (cb) {
+      const stored = localStorage.getItem(AUTO_REFRESH_KEY);
+      cb.checked = stored !== '0';
+      cb.addEventListener('change', () => {
+        localStorage.setItem(AUTO_REFRESH_KEY, cb.checked ? '1' : '0');
+        scheduleSectionRefresh();
+      });
+    }
+    if (sel) {
+      sel.addEventListener('change', () => {
+        localStorage.setItem(AUTO_INTERVAL_KEY, sel.value);
+        scheduleSectionRefresh();
+      });
+    }
+    if (btn) btn.addEventListener('click', () => loadCurrentSection());
   })();
 
   if (localStorage.getItem(JWT_KEY)) {
