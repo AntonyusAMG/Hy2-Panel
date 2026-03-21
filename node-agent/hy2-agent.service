@@ -1,0 +1,16 @@
+[Unit]
+Description=Hysteria2 Node Agent
+After=network.target hysteria-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/hy2-agent
+ExecStart=/opt/hy2-agent/venv/bin/uvicorn agent:app --host 0.0.0.0 --port 4000
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/hy2-agent/agent.log
+StandardError=append:/var/log/hy2-agent/error.log
+
+[Install]
+WantedBy=multi-user.target

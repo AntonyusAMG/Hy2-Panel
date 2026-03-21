@@ -16,3 +16,25 @@ hy2-panel/
 ```
 
 Документация и детальный план — в каталоге проекта разработки (`HY2_Panel_Prompt.md`, `HY2_Panel_Plan.md`).
+
+## Локальная установка ноды (без GitHub)
+
+Из корня репозитория `hy2-panel`:
+
+```bash
+sudo bash ./scripts/install.sh "https://ВАШ_МАСТЕР" "$(openssl rand -hex 32)" "ИМЯ_НОДЫ" "vpn.ваш-домен.ru"
+```
+
+Файлы `agent.py`, `requirements.txt` и `ui/` копируются из каталога `node-agent/` рядом со скриптом. Для неинтерактивного ввода логина/пароля панели:
+
+```bash
+export HY2_PANEL_LOGIN=admin
+export HY2_PANEL_PASSWORD='ваш_пароль_8+'
+echo y | sudo -E bash ./scripts/install.sh ...
+```
+
+## Обновление
+
+```bash
+sudo bash ./scripts/update.sh
+```

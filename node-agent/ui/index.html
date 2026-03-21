@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HY2 Node</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #1c2130;
+      --bg1: #212736;
+      --accent: #3f9de1;
+      --txt: #cdd5e0;
+      --muted: #8b98ab;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 20% -10%, #243049 0%, var(--bg0) 55%);
+      color: var(--txt);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(440px, 100%);
+      background: var(--bg1);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 28px 26px 24px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-family: Syne, sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      font-size: 1.55rem;
+    }
+    p.lead { margin: 0 0 20px; color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
+    .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.85rem; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(63, 157, 225, 0.12);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin: 12px 0 6px; }
+    input {
+      width: 100%;
+      padding: 12px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #1a2030;
+      color: var(--txt);
+      outline: none;
+    }
+    input:focus { border-color: rgba(63, 157, 225, 0.55); }
+    button {
+      margin-top: 18px;
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(180deg, #4aa7e8, #2f86c5);
+      color: #0b1420;
+    }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .err { margin-top: 12px; color: #ff6b6b; font-size: 0.88rem; min-height: 1.2em; }
+    .ok { margin-top: 12px; color: #3dd68c; font-size: 0.88rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge"><span class="mono">HY2</span> node panel</div>
+    <h1>Вход в панель ноды</h1>
+    <p class="lead">Полный интерфейс будет на следующем этапе. Сейчас можно проверить логин и выдачу JWT.</p>
+    <form id="f">
+      <label for="login">Логин</label>
+      <input id="login" name="login" autocomplete="username" />
+      <label for="password">Пароль</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" />
+      <button type="submit" id="btn">Войти</button>
+      <div class="err" id="err"></div>
+      <div class="ok mono" id="ok"></div>
+    </form>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    $('f').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('err').textContent = '';
+      $('ok').textContent = '';
+      $('btn').disabled = true;
+      try {
+        const body = {
+          login: $('login').value.trim(),
+          password: $('password').value,
+        };
+        const r = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.detail || r.statusText || 'Ошибка входа');
+        localStorage.setItem('hy2_jwt', j.access_token);
+        $('ok').textContent = 'JWT сохранён в localStorage (hy2_jwt). Дальше — разделы панели.';
+      } catch (err) {
+        $('err').textContent = String(err.message || err);
+      } finally {
+        $('btn').disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
