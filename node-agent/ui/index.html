@@ -153,28 +153,31 @@
       background: radial-gradient(circle, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 65%);
     }
     .login-theme-bar {
-      position: absolute;
-      top: 14px;
-      right: 14px;
-      z-index: 20;
+      width: 100%;
+      max-width: 400px;
       display: flex;
-      justify-content: flex-end;
-      max-width: calc(100% - 28px);
+      justify-content: center;
+      margin-bottom: 20px;
+      flex-shrink: 0;
+      z-index: 20;
     }
     .login-page-center {
       flex: 1;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 72px 20px 28px;
+      padding: 24px 20px 32px;
       min-height: 0;
       position: relative;
       z-index: 1;
+      width: 100%;
     }
     .login-card {
       position: relative;
       width: 100%;
       max-width: 400px;
+      text-align: center;
       background: color-mix(in srgb, var(--bg1) 88%, transparent);
       border: 1px solid var(--border);
       border-radius: 24px;
@@ -195,6 +198,7 @@
     }
     .login-brand {
       margin-bottom: 8px;
+      text-align: center;
     }
     .login-brand .logo {
       font-family: Syne, sans-serif;
@@ -214,6 +218,9 @@
     }
     .login-theme-dd {
       position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
     }
     .login-theme-dd-trigger {
       display: inline-flex;
@@ -272,7 +279,7 @@
     }
     .login-theme-dd-label {
       min-width: 5.5em;
-      text-align: left;
+      text-align: center;
     }
     .login-theme-dd-chevron {
       flex-shrink: 0;
@@ -285,7 +292,9 @@
     }
     .login-theme-dd-menu {
       position: absolute;
-      right: 0;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
       top: calc(100% + 8px);
       min-width: 220px;
       margin: 0;
@@ -312,8 +321,9 @@
     .login-theme-dd-opt {
       display: flex;
       align-items: center;
+      justify-content: center;
       width: 100%;
-      padding: 10px 12px 10px 36px;
+      padding: 10px 14px;
       border: none;
       border-radius: 10px;
       background: transparent;
@@ -321,7 +331,7 @@
       font-family: inherit;
       font-size: 13px;
       font-weight: 500;
-      text-align: left;
+      text-align: center;
       cursor: pointer;
       position: relative;
       transition: background 0.15s, color 0.15s;
@@ -335,23 +345,12 @@
       font-weight: 700;
       color: var(--accent2);
     }
-    .login-theme-dd-opt.active::before {
-      content: "";
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      width: 8px;
-      height: 8px;
-      margin-top: -4px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent2), var(--accent));
-      box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent);
-    }
-    :root[data-theme="light"] .login-theme-dd-opt.active::before {
-      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #1e3a8a));
-    }
-    :root[data-theme="accent-violet"] .login-theme-dd-opt.active::before {
-      background: linear-gradient(135deg, #b47aff, #7c4dff);
+    .login-theme-dd-opt.active::after {
+      content: "✓";
+      margin-left: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      opacity: 0.85;
     }
     .login-card h1 {
       font-family: Syne, sans-serif;
@@ -361,6 +360,19 @@
       letter-spacing: -0.02em;
     }
     .login-card .lead { color: var(--muted); font-size: 0.9rem; margin-bottom: 0; }
+    #form-login .field {
+      text-align: center;
+    }
+    #form-login .field label {
+      display: block;
+      text-align: center;
+    }
+    #form-login .inp {
+      text-align: left;
+    }
+    #login-err {
+      text-align: center;
+    }
 
     /* ——— App ——— */
     #view-app {
@@ -704,30 +716,30 @@
     <div class="login-bg" aria-hidden="true"></div>
     <div class="login-glow login-glow1" aria-hidden="true"></div>
     <div class="login-glow login-glow2" aria-hidden="true"></div>
-    <div class="login-theme-bar">
-      <div class="login-theme-dd" id="login-theme-chips">
-        <button type="button" class="login-theme-dd-trigger" id="btn-login-theme" aria-expanded="false" aria-haspopup="listbox" aria-controls="login-theme-menu">
-          <span class="login-theme-dd-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M12 2.25a9.75 9.75 0 100 19.5 9.75 9.75 0 000-19.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-              <path d="M12 2.25v19.5" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="8" cy="13" r="2" fill="currentColor" opacity="0.45"/>
-              <circle cx="12" cy="8" r="2" fill="currentColor" opacity="0.55"/>
-              <circle cx="16" cy="13" r="2" fill="currentColor" opacity="0.35"/>
-            </svg>
-          </span>
-          <span class="login-theme-dd-label" id="login-theme-current-label">TG Dark</span>
-          <svg class="login-theme-dd-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <ul class="login-theme-dd-menu hidden" id="login-theme-menu" role="listbox" aria-label="Тема оформления">
-          <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="tg-dark">TG Dark</button></li>
-          <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="crm-soft">CRM soft</button></li>
-          <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="light">Светлая</button></li>
-          <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="accent-violet">Violet</button></li>
-        </ul>
-      </div>
-    </div>
     <div class="login-page-center">
+      <div class="login-theme-bar">
+        <div class="login-theme-dd" id="login-theme-chips">
+          <button type="button" class="login-theme-dd-trigger" id="btn-login-theme" aria-expanded="false" aria-haspopup="listbox" aria-controls="login-theme-menu">
+            <span class="login-theme-dd-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M12 2.25a9.75 9.75 0 100 19.5 9.75 9.75 0 000-19.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M12 2.25v19.5" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="8" cy="13" r="2" fill="currentColor" opacity="0.45"/>
+                <circle cx="12" cy="8" r="2" fill="currentColor" opacity="0.55"/>
+                <circle cx="16" cy="13" r="2" fill="currentColor" opacity="0.35"/>
+              </svg>
+            </span>
+            <span class="login-theme-dd-label" id="login-theme-current-label">TG Dark</span>
+            <svg class="login-theme-dd-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <ul class="login-theme-dd-menu hidden" id="login-theme-menu" role="listbox" aria-label="Тема оформления">
+            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="tg-dark">TG Dark</button></li>
+            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="crm-soft">CRM soft</button></li>
+            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="light">Светлая</button></li>
+            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="accent-violet">Violet</button></li>
+          </ul>
+        </div>
+      </div>
       <div class="login-card">
         <div class="login-brand">
           <div class="logo">HY2 Node</div>
