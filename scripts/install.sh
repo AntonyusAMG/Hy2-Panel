@@ -183,6 +183,12 @@ ACME_STORAGE_DIR="/var/lib/hysteria/acme"
 
 info "Создание каталогов..."
 mkdir -p /etc/hysteria /opt/hy2-agent/ui /var/log/hy2-agent "$ACME_STORAGE_DIR"
+# Hysteria работает от пользователя hysteria (создаётся get.hy2.sh) — нужна запись в каталог ACME
+if id hysteria &>/dev/null; then
+  chown -R hysteria:hysteria "$ACME_STORAGE_DIR" || warn "chown ${ACME_STORAGE_DIR} не удался"
+else
+  warn "Пользователь hysteria не найден — после установки HY2 проверьте права на ${ACME_STORAGE_DIR}"
+fi
 
 info "Запись /etc/hysteria/config.yaml (встроенный ACME: ${ACME_CA}, challenge TLS-ALPN)..."
 cat > /etc/hysteria/config.yaml <<YAML
