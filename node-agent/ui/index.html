@@ -1,90 +1,220 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="dark">
+<html lang="ru" data-theme="tg-dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hysteria 2 — панель ноды</title>
+  <title>HY2 Node — панель</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" id="hljs-theme" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
   <style>
-    :root[data-theme="dark"] {
-      --bg0: #1c2130;
-      --bg1: #212736;
-      --bg2: #2a3347;
-      --accent: #3f9de1;
-      --txt: #cdd5e0;
-      --muted: #8b98ab;
-      --green: #3dd68c;
-      --red: #ff6b6b;
-      --amber: #ffb347;
-      --border: rgba(255,255,255,0.08);
-      --shadow: rgba(0,0,0,0.35);
-      --grad-top: #243049;
+    /* === Темы: tg-dark | crm-soft | light | accent-violet (по мотивам Katasia / TG / CRM) === */
+    :root[data-theme="tg-dark"] {
+      --bg0: #0e1621;
+      --bg1: #17212b;
+      --bg2: #1f2a37;
+      --accent: #5288c1;
+      --accent2: #6ab3f3;
+      --txt: #e4edf5;
+      --muted: #8f9aad;
+      --green: #5dc992;
+      --red: #e56565;
+      --amber: #e9a84c;
+      --border: rgba(255,255,255,0.07);
+      --shadow: rgba(0,0,0,0.45);
+      --glow: rgba(82, 136, 193, 0.12);
+      --sidebar-w: 268px;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --font: "Plus Jakarta Sans", system-ui, sans-serif;
+    }
+    :root[data-theme="crm-soft"] {
+      --bg0: #12161c;
+      --bg1: #1a1f28;
+      --bg2: #232a36;
+      --accent: #5b8def;
+      --accent2: #7ec8ff;
+      --txt: #e8eef7;
+      --muted: #8b95a8;
+      --green: #4fd1a5;
+      --red: #f07178;
+      --amber: #ebc06d;
+      --border: rgba(255,255,255,0.06);
+      --shadow: rgba(0,0,0,0.5);
+      --glow: rgba(91, 141, 239, 0.1);
+      --sidebar-w: 268px;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --font: "Plus Jakarta Sans", system-ui, sans-serif;
     }
     :root[data-theme="light"] {
-      --bg0: #f0f4f8;
+      --bg0: #eef2f7;
       --bg1: #ffffff;
-      --bg2: #f4f7fb;
-      --accent: #2980b9;
-      --txt: #1a2333;
-      --muted: #5c6b7e;
-      --green: #16a34a;
+      --bg2: #f0f4fa;
+      --accent: #2563eb;
+      --accent2: #3b82f6;
+      --txt: #0f172a;
+      --muted: #64748b;
+      --green: #059669;
       --red: #dc2626;
       --amber: #d97706;
-      --border: rgba(0,0,0,0.08);
-      --shadow: rgba(0,0,0,0.08);
-      --grad-top: #dbe7f3;
+      --border: rgba(15,23,42,0.08);
+      --shadow: rgba(15,23,42,0.08);
+      --glow: rgba(37, 99, 235, 0.08);
+      --sidebar-w: 268px;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --font: "Plus Jakarta Sans", system-ui, sans-serif;
     }
+    :root[data-theme="accent-violet"] {
+      --bg0: #0f0d14;
+      --bg1: #181522;
+      --bg2: #221c30;
+      --accent: #a78bfa;
+      --accent2: #c4b5fd;
+      --txt: #f1eefe;
+      --muted: #9b8fb8;
+      --green: #6ee7b7;
+      --red: #fb7185;
+      --amber: #fcd34d;
+      --border: rgba(255,255,255,0.07);
+      --shadow: rgba(0,0,0,0.55);
+      --glow: rgba(167, 139, 250, 0.12);
+      --sidebar-w: 268px;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --font: "Plus Jakarta Sans", system-ui, sans-serif;
+    }
+
     * { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; }
     body {
-      font-family: Inter, system-ui, sans-serif;
-      background: radial-gradient(1000px 500px at 15% -5%, var(--grad-top) 0%, var(--bg0) 50%);
+      font-family: var(--font);
+      background: var(--bg0);
       color: var(--txt);
       font-size: 15px;
-      line-height: 1.45;
+      line-height: 1.5;
     }
     .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.82rem; }
     .muted { color: var(--muted); }
     .hidden { display: none !important; }
 
-    /* Login */
-    #view-login {
+    /* ——— Login (4 темы + мягкая карточка) ——— */
+    .login-page {
       min-height: 100vh;
       display: grid;
       place-items: center;
-      padding: 24px;
+      padding: 24px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .login-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 900px 500px at 15% 0%, var(--glow), transparent 55%),
+        radial-gradient(ellipse 700px 400px at 100% 80%, var(--glow), transparent 50%),
+        linear-gradient(180deg, var(--bg0) 0%, var(--bg0) 100%);
+      pointer-events: none;
+    }
+    .login-bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     }
     .login-card {
-      width: min(420px, 100%);
+      position: relative;
+      width: min(440px, 100%);
       background: var(--bg1);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px 26px;
-      box-shadow: 0 24px 60px var(--shadow);
+      border-radius: var(--radius);
+      padding: 32px 28px 30px;
+      box-shadow: 0 24px 80px var(--shadow), 0 0 0 1px var(--border) inset;
+    }
+    .login-brand {
+      margin-bottom: 8px;
+    }
+    .login-brand .logo {
+      font-family: Syne, sans-serif;
+      font-weight: 800;
+      font-size: 1.35rem;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .login-brand .sub {
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.45;
+    }
+    .theme-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 20px 0 22px;
+    }
+    .theme-chips button {
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--muted);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .theme-chips button:hover { color: var(--txt); border-color: var(--accent); }
+    .theme-chips button.active {
+      background: linear-gradient(135deg, rgba(82,136,193,0.2), rgba(82,136,193,0.08));
+      border-color: var(--accent);
+      color: var(--accent2);
+    }
+    :root[data-theme="light"] .theme-chips button.active {
+      background: rgba(37, 99, 235, 0.12);
+      color: var(--accent);
+    }
+    :root[data-theme="accent-violet"] .theme-chips button.active {
+      background: rgba(167, 139, 250, 0.15);
+      color: var(--accent2);
     }
     .login-card h1 {
       font-family: Syne, sans-serif;
       font-weight: 800;
-      font-size: 1.5rem;
-      margin: 0 0 8px;
+      font-size: 1.35rem;
+      margin: 0 0 6px;
       letter-spacing: -0.02em;
     }
-    .login-card .lead { color: var(--muted); font-size: 0.92rem; margin-bottom: 20px; }
+    .login-card .lead { color: var(--muted); font-size: 0.9rem; margin-bottom: 0; }
 
-    /* App shell */
+    /* ——— App ——— */
     #view-app {
       display: grid;
-      grid-template-columns: 240px 1fr;
+      grid-template-columns: var(--sidebar-w) 1fr;
       grid-template-rows: auto 1fr;
       min-height: 100vh;
     }
     @media (max-width: 900px) {
       #view-app { grid-template-columns: 1fr; }
       .sidebar { display: none; }
-      .sidebar.open { display: flex; position: fixed; inset: 0; z-index: 50; background: var(--bg0); flex-direction: column; padding: 16px; }
+      .sidebar.open {
+        display: flex;
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        background: color-mix(in srgb, var(--bg0) 96%, transparent);
+        backdrop-filter: blur(8px);
+        flex-direction: column;
+        padding: 20px;
+        border-right: 0;
+      }
     }
 
     .topbar {
@@ -93,119 +223,147 @@
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 12px 20px;
-      background: var(--bg1);
+      padding: 14px 22px;
+      background: color-mix(in srgb, var(--bg1) 85%, transparent);
+      backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
     }
     .topbar h1 {
       font-family: Syne, sans-serif;
       font-weight: 800;
-      font-size: 1.15rem;
+      font-size: 1.05rem;
       margin: 0;
       display: flex;
       align-items: center;
       gap: 10px;
+      letter-spacing: -0.02em;
     }
     .badge-node {
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       font-weight: 600;
-      padding: 4px 10px;
+      padding: 5px 11px;
       border-radius: 999px;
-      background: rgba(63, 157, 225, 0.15);
-      color: var(--accent);
+      background: linear-gradient(135deg, rgba(82,136,193,0.2), rgba(82,136,193,0.06));
+      color: var(--accent2);
       max-width: 220px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      border: 1px solid var(--border);
     }
-    .topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    :root[data-theme="accent-violet"] .badge-node {
+      background: linear-gradient(135deg, rgba(167,139,250,0.2), rgba(167,139,250,0.06));
+    }
+    .topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .btn-icon {
       border: 1px solid var(--border);
       background: var(--bg2);
       color: var(--txt);
-      border-radius: 10px;
-      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
       cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 500;
-    }
-    .btn-icon:hover { border-color: var(--accent); }
-    .status-pill {
-      font-size: 0.75rem;
+      font-size: 0.82rem;
       font-weight: 600;
-      padding: 4px 8px;
-      border-radius: 6px;
+      font-family: inherit;
+      transition: border-color 0.15s, background 0.15s;
     }
-    .status-pill.ok { background: rgba(61, 214, 140, 0.15); color: var(--green); }
-    .status-pill.bad { background: rgba(255, 107, 107, 0.15); color: var(--red); }
+    .btn-icon:hover { border-color: var(--accent); background: var(--bg1); }
+    .status-pill {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 8px;
+      letter-spacing: 0.02em;
+    }
+    .status-pill.ok { background: rgba(93, 201, 146, 0.14); color: var(--green); }
+    .status-pill.bad { background: rgba(229, 101, 101, 0.14); color: var(--red); }
 
     .sidebar {
       grid-row: 2;
-      padding: 16px 12px;
+      padding: 20px 14px 24px;
       border-right: 1px solid var(--border);
-      background: var(--bg1);
+      background: linear-gradient(180deg, var(--bg1) 0%, color-mix(in srgb, var(--bg0) 40%, var(--bg1)) 100%);
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
     }
+    .sidebar-brand {
+      padding: 8px 12px 18px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+    .sidebar-brand .t { font-weight: 800; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+    .sidebar-brand .n { font-weight: 700; font-size: 0.95rem; margin-top: 4px; color: var(--txt); }
     .nav-btn {
       text-align: left;
       border: 0;
       background: transparent;
-      color: var(--txt);
+      color: var(--muted);
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      font-size: 0.95rem;
-      font-weight: 500;
+      font-size: 0.92rem;
+      font-weight: 600;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.15s, color 0.15s;
     }
-    .nav-btn:hover { background: var(--bg2); }
+    .nav-btn .ic { font-size: 1.1rem; opacity: 0.9; width: 1.4em; text-align: center; }
+    .nav-btn:hover { background: var(--bg2); color: var(--txt); }
     .nav-btn.active {
-      background: rgba(63, 157, 225, 0.12);
-      color: var(--accent);
+      background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent);
+      color: var(--accent2);
+      box-shadow: inset 3px 0 0 var(--accent);
     }
 
     main {
-      padding: 20px 24px 32px;
+      padding: 24px 26px 40px;
       overflow: auto;
+      background: var(--bg0);
     }
     .section-title {
       font-family: Syne, sans-serif;
       font-weight: 700;
-      font-size: 1.25rem;
-      margin: 0 0 16px;
+      font-size: 1.35rem;
+      margin: 0 0 20px;
+      letter-spacing: -0.02em;
     }
 
     .grid-metrics {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 14px;
-      margin-bottom: 20px;
+      gap: 16px;
+      margin-bottom: 22px;
     }
     .metric {
       background: var(--bg1);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: 0 8px 32px var(--shadow);
     }
     .metric label {
       display: block;
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 0.04em;
-      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      margin-bottom: 8px;
     }
-    .metric .val { font-size: 1.35rem; font-weight: 600; font-family: Syne, sans-serif; }
+    .metric .val { font-size: 1.4rem; font-weight: 700; font-family: Syne, sans-serif; }
 
     .chart-wrap {
       background: var(--bg1);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
-      margin-bottom: 20px;
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 22px;
+      box-shadow: 0 8px 32px var(--shadow);
     }
-    .chart-wrap h3 { margin: 0 0 12px; font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+    .chart-wrap h3 { margin: 0 0 14px; font-size: 0.88rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
     .bars {
       display: flex;
       align-items: flex-end;
@@ -213,56 +371,49 @@
       height: 140px;
       padding-top: 8px;
     }
-    .bar-col {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      min-width: 0;
-    }
+    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
     .bar {
       width: 100%;
       max-width: 48px;
-      border-radius: 6px 6px 2px 2px;
-      background: linear-gradient(180deg, var(--accent), #1e4a6e);
+      border-radius: 8px 8px 4px 4px;
+      background: linear-gradient(180deg, var(--accent2), var(--accent));
+      opacity: 0.92;
       min-height: 4px;
       transition: height 0.25s ease;
     }
-    .bar-col span {
-      font-size: 0.68rem;
-      color: var(--muted);
-      white-space: nowrap;
-    }
+    .bar-col span { font-size: 0.65rem; color: var(--muted); white-space: nowrap; }
 
     table.data {
       width: 100%;
       border-collapse: collapse;
       background: var(--bg1);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: var(--radius);
       overflow: hidden;
+      box-shadow: 0 8px 32px var(--shadow);
     }
     table.data th, table.data td {
-      padding: 10px 12px;
+      padding: 12px 14px;
       text-align: left;
       border-bottom: 1px solid var(--border);
     }
     table.data th {
       background: var(--bg2);
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       text-transform: uppercase;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.06em;
+      font-weight: 700;
       color: var(--muted);
     }
     table.data tr:last-child td { border-bottom: 0; }
+    table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent) 4%, var(--bg1)); }
 
     .progress {
       height: 8px;
       border-radius: 999px;
       background: var(--bg2);
       overflow: hidden;
-      margin-top: 4px;
+      margin-top: 6px;
     }
     .progress > i {
       display: block;
@@ -275,30 +426,34 @@
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
       align-items: center;
     }
-    input.inp, select.inp {
+    input.inp, select.inp, textarea.inp {
       border: 1px solid var(--border);
       background: var(--bg2);
       color: var(--txt);
-      border-radius: 10px;
-      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
       font-size: 0.92rem;
       min-width: 200px;
+      font-family: inherit;
     }
+    input.inp:focus, textarea.inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
     .btn {
       border: 0;
-      border-radius: 10px;
-      padding: 10px 16px;
-      font-weight: 600;
+      border-radius: var(--radius-sm);
+      padding: 11px 18px;
+      font-weight: 700;
       cursor: pointer;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
+      font-family: inherit;
     }
     .btn-primary {
-      background: linear-gradient(180deg, #4aa7e8, #2f86c5);
-      color: #0b1420;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      color: #0a0a0f;
     }
+    :root[data-theme="light"] .btn-primary { color: #fff; }
     .btn-danger { background: var(--red); color: #fff; }
     .btn-ghost {
       background: var(--bg2);
@@ -309,28 +464,31 @@
 
     .config-pre {
       margin: 0;
-      padding: 16px;
+      padding: 18px;
       background: var(--bg2);
-      border-radius: 12px;
+      border-radius: var(--radius);
       overflow: auto;
       max-height: min(70vh, 640px);
       font-size: 0.8rem;
-      line-height: 1.5;
+      line-height: 1.55;
+      border: 1px solid var(--border);
     }
     .config-badge {
       display: inline-block;
-      font-size: 0.75rem;
-      padding: 4px 10px;
-      border-radius: 6px;
-      background: rgba(255, 179, 71, 0.15);
+      font-size: 0.74rem;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: rgba(233, 168, 76, 0.12);
       color: var(--amber);
-      margin-bottom: 12px;
+      margin-bottom: 14px;
+      font-weight: 600;
     }
 
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(4px);
       display: grid;
       place-items: center;
       z-index: 100;
@@ -339,48 +497,60 @@
     .modal {
       background: var(--bg1);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 22px;
+      border-radius: var(--radius);
+      padding: 26px;
       width: min(420px, 100%);
       max-height: 90vh;
       overflow: auto;
+      box-shadow: 0 32px 80px var(--shadow);
     }
-    .modal h3 { margin: 0 0 14px; font-family: Syne, sans-serif; }
-    .field { margin-bottom: 12px; }
-    .field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+    .modal h3 { margin: 0 0 14px; font-family: Syne, sans-serif; font-weight: 800; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
 
     .toast {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
-      max-width: 360px;
-      padding: 12px 16px;
-      border-radius: 12px;
+      bottom: 22px;
+      right: 22px;
+      max-width: 380px;
+      padding: 14px 18px;
+      border-radius: var(--radius-sm);
       background: var(--bg1);
       border: 1px solid var(--border);
-      box-shadow: 0 12px 40px var(--shadow);
+      box-shadow: 0 16px 48px var(--shadow);
       z-index: 200;
       font-size: 0.9rem;
+      font-weight: 500;
     }
     .toast.err { border-color: var(--red); color: var(--red); }
 
     .mobile-nav-btn { display: none; }
     @media (max-width: 900px) {
-      .mobile-nav-btn { display: inline-flex; }
+      .mobile-nav-btn { display: inline-flex; align-items: center; justify-content: center; }
     }
   </style>
 </head>
 <body>
   <div id="view-login">
+    <div class="login-bg" aria-hidden="true"></div>
     <div class="login-card">
-      <div class="badge-node mono" style="margin-bottom:12px;display:inline-block;">HY2 node</div>
+      <div class="login-brand">
+        <div class="logo">HY2 Node</div>
+        <p class="sub">Панель ноды Hysteria 2 · локальное управление</p>
+      </div>
+      <div class="theme-chips" id="login-theme-chips" role="group" aria-label="Тема оформления">
+        <button type="button" data-theme-set="tg-dark">Telegram</button>
+        <button type="button" data-theme-set="crm-soft">CRM soft</button>
+        <button type="button" data-theme-set="light">Светлая</button>
+        <button type="button" data-theme-set="accent-violet">Violet</button>
+      </div>
       <h1>Вход</h1>
-      <p class="lead">Панель управления нодой Hysteria 2. Данные не уходят на сторонние серверы.</p>
-      <form id="form-login">
+      <p class="lead">Учётные данные задаются при установке ноды.</p>
+      <form id="form-login" style="margin-top:18px;">
         <div class="field"><label for="inp-login">Логин</label><input class="inp" id="inp-login" autocomplete="username" required /></div>
         <div class="field"><label for="inp-pass">Пароль</label><input class="inp" id="inp-pass" type="password" autocomplete="current-password" required /></div>
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Войти</button>
-        <p id="login-err" class="mono" style="color:var(--red);min-height:1.2em;margin-top:10px;font-size:0.88rem;"></p>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;">Войти</button>
+        <p id="login-err" class="mono" style="color:var(--red);min-height:1.2em;margin-top:12px;font-size:0.85rem;"></p>
       </form>
     </div>
   </div>
@@ -389,21 +559,25 @@
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <button type="button" class="btn-icon mobile-nav-btn" id="btn-menu" aria-label="Меню">☰</button>
-        <h1>Hysteria 2 <span class="badge-node mono" id="hdr-node">—</span></h1>
+        <h1>HY2 <span class="badge-node mono" id="hdr-node">—</span></h1>
         <span class="status-pill ok mono" id="hdr-online">онлайн</span>
-        <span class="mono" style="font-size:0.78rem;color:var(--muted);" id="hdr-ver">—</span>
+        <span class="mono" style="font-size:0.74rem;color:var(--muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="hdr-ver">—</span>
       </div>
       <div class="topbar-actions">
-        <button type="button" class="btn-icon" id="btn-theme" title="Тема">Тема</button>
+        <button type="button" class="btn-icon" id="btn-theme" title="Сменить тему">Тема</button>
         <button type="button" class="btn-icon" id="btn-logout">Выход</button>
       </div>
     </header>
 
     <aside class="sidebar" id="sidebar">
-      <button type="button" class="nav-btn active" data-section="overview">Обзор</button>
-      <button type="button" class="nav-btn" data-section="users">Пользователи</button>
-      <button type="button" class="nav-btn" data-section="config">Конфигурация</button>
-      <button type="button" class="nav-btn" data-section="server">Сервер</button>
+      <div class="sidebar-brand">
+        <div class="t">Разделы</div>
+        <div class="n">Нода</div>
+      </div>
+      <button type="button" class="nav-btn active" data-section="overview"><span class="ic" aria-hidden="true">◆</span> Обзор</button>
+      <button type="button" class="nav-btn" data-section="users"><span class="ic" aria-hidden="true">◎</span> Пользователи</button>
+      <button type="button" class="nav-btn" data-section="config"><span class="ic" aria-hidden="true">◇</span> Конфигурация</button>
+      <button type="button" class="nav-btn" data-section="server"><span class="ic" aria-hidden="true">▣</span> Сервер</button>
     </aside>
 
     <main>
@@ -416,10 +590,10 @@
           <div class="metric"><label>Uptime</label><div class="val mono" id="m-uptime">—</div></div>
         </div>
         <div class="chart-wrap">
-          <h3>Трафик за 7 дней (снимки при открытии обзора)</h3>
+          <h3>Трафик за 7 дней</h3>
           <div class="bars" id="chart-bars"></div>
         </div>
-        <h3 style="font-size:0.95rem;color:var(--muted);margin:0 0 10px;">Активность / сессии (по данным stats API)</h3>
+        <h3 style="font-size:0.88rem;color:var(--muted);margin:0 0 12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Сессии / stats API</h3>
         <table class="data">
           <thead><tr><th>Идентификатор</th><th>Tx / Rx</th><th>Примечание</th></tr></thead>
           <tbody id="tbl-conn"></tbody>
@@ -449,13 +623,13 @@
 
       <section id="sec-config" class="hidden">
         <h2 class="section-title">Конфигурация</h2>
-        <span class="config-badge">Только просмотр — правки через мастер-панель или API</span>
+        <span class="config-badge">Только просмотр</span>
         <pre class="config-pre mono"><code id="cfg-yaml" class="language-yaml"></code></pre>
       </section>
 
       <section id="sec-server" class="hidden">
         <h2 class="section-title">Сервер</h2>
-        <div class="grid-metrics" style="margin-bottom:20px;">
+        <div class="grid-metrics" style="margin-bottom:22px;">
           <div class="metric"><label>CPU</label><div class="val mono" id="srv-cpu">—</div><div class="progress"><i id="srv-cpu-bar" style="width:0%"></i></div></div>
           <div class="metric"><label>RAM</label><div class="val mono" id="srv-ram">—</div><div class="progress"><i id="srv-ram-bar" style="width:0%"></i></div></div>
           <div class="metric"><label>Диск /</label><div class="val mono" id="srv-disk">—</div><div class="progress"><i id="srv-disk-bar" style="width:0%"></i></div></div>
@@ -473,9 +647,9 @@
       <h3>Новый пользователь</h3>
       <div class="field"><label>telegram_id</label><input class="inp mono" id="mu-tg" inputmode="numeric" pattern="[0-9]+" placeholder="например 100356905" /></div>
       <div class="field"><label>Пароль клиента</label><input class="inp mono" id="mu-pw" type="text" autocomplete="off" /></div>
-      <div class="field"><label>Лимит ГБ (инфо, в HY2 пока не хранится)</label><input class="inp" id="mu-gb" type="text" placeholder="—" disabled /></div>
+      <div class="field"><label>Лимит ГБ (инфо)</label><input class="inp" id="mu-gb" type="text" placeholder="—" disabled /></div>
       <div class="field"><label>Дней (инфо)</label><input class="inp" id="mu-days" type="text" placeholder="—" disabled /></div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
         <button type="button" class="btn btn-ghost" id="mu-cancel">Отмена</button>
         <button type="button" class="btn btn-primary" id="mu-save">Создать</button>
       </div>
@@ -485,11 +659,11 @@
   <div id="modal-uri" class="modal-backdrop hidden">
     <div class="modal" style="max-width:min(560px,100%)">
       <h3>Ссылка для клиента</h3>
-      <p class="lead" style="font-size:0.88rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
-        Формат <span class="mono">hysteria2://</span> — для HAPP, v2rayN и других клиентов. Строка содержит <strong>пароль</strong>, не отправляйте её в открытых чатах.
+      <p class="lead" style="font-size:0.88rem;color:var(--muted);margin:0 0 14px;line-height:1.5;">
+        <span class="mono">hysteria2://</span> — HAPP, v2rayN и др. Строка содержит <strong>пароль</strong>.
       </p>
-      <textarea id="uri-out" class="inp mono" readonly rows="4" style="width:100%;resize:vertical;min-height:100px;font-size:0.8rem;"></textarea>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
+      <textarea id="uri-out" class="inp mono" readonly rows="4" style="width:100%;resize:vertical;min-height:100px;font-size:0.78rem;"></textarea>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
         <button type="button" class="btn btn-ghost" id="uri-close">Закрыть</button>
         <button type="button" class="btn btn-primary" id="uri-copy">Копировать</button>
       </div>
@@ -505,6 +679,8 @@
   const JWT_KEY = 'hy2_jwt';
   const THEME_KEY = 'hy2_theme';
   const TRAFFIC_HIST_KEY = 'hy2_traffic_daily_v1';
+  const THEMES = ['tg-dark', 'crm-soft', 'light', 'accent-violet'];
+  const THEME_LABELS = { 'tg-dark': 'Telegram', 'crm-soft': 'CRM soft', 'light': 'Светлая', 'accent-violet': 'Violet' };
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -554,7 +730,6 @@
     return m + 'м';
   }
 
-  /** Суммирует upload/download из вложенного объекта traffic API */
   function sumTrafficStats(obj) {
     let up = 0, down = 0;
     function walk(x) {
@@ -572,7 +747,6 @@
     return { up, down, total: up + down };
   }
 
-  /** Плоский список пользователей с tx/rx если есть */
   function perUserFromTraffic(traffic, userIds) {
     const map = {};
     userIds.forEach((id) => { map[id] = { up: 0, down: 0 }; });
@@ -639,7 +813,7 @@
       });
     }
     if (!rows.length) {
-      rows.push({ id: '—', pair: '—', note: 'Формат stats не содержит известных полей — см. документацию HY2' });
+      rows.push({ id: '—', pair: '—', note: 'Формат stats не распознан' });
     }
     return rows;
   }
@@ -720,6 +894,14 @@
     }
   }
 
+  function cleanHysteriaVersion(s) {
+    if (!s) return '—';
+    const lines = String(s).split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    const verLine = lines.find((l) => /^\s*Version:/i.test(l) || /v\d+\.\d+/i.test(l));
+    if (verLine) return verLine.replace(/^\s*Version:\s*/i, '').trim().slice(0, 80);
+    return lines[0].slice(0, 80);
+  }
+
   async function loadOverview() {
     try {
       const st = await api('/status');
@@ -732,7 +914,7 @@
       }
       const ids = users.users || [];
       $('#hdr-node').textContent = st.node_name || 'нода';
-      $('#hdr-ver').textContent = st.hysteria_version || '';
+      $('#hdr-ver').textContent = cleanHysteriaVersion(st.hysteria_version);
       const hyOk = st.hysteria_active === 'active';
       const el = $('#hdr-online');
       el.textContent = hyOk ? 'HY2 active' : 'HY2 ' + (st.hysteria_active || '?');
@@ -780,7 +962,7 @@
           '<td><span class="status-pill ok">в конфиге</span></td>' +
           '<td style="white-space:nowrap">' +
           '<button type="button" class="btn btn-ghost" data-act="link" data-id="' + id + '">Ссылка</button> ' +
-          '<button type="button" class="btn btn-ghost" data-act="reset" data-id="' + id + '">Сброс трафика</button> ' +
+          '<button type="button" class="btn btn-ghost" data-act="reset" data-id="' + id + '">Сброс</button> ' +
           '<button type="button" class="btn btn-danger" data-act="del" data-id="' + id + '">Удалить</button>' +
           '</td>';
         tb.appendChild(tr);
@@ -884,7 +1066,8 @@
   }
 
   function applyHljsTheme() {
-    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const t = document.documentElement.getAttribute('data-theme') || 'tg-dark';
+    const dark = t !== 'light';
     const link = document.getElementById('hljs-theme');
     if (link) {
       link.href = dark
@@ -893,13 +1076,30 @@
     }
   }
 
+  function syncLoginThemeChips() {
+    const cur = document.documentElement.getAttribute('data-theme') || 'tg-dark';
+    $$('#login-theme-chips [data-theme-set]').forEach((b) => {
+      b.classList.toggle('active', b.getAttribute('data-theme-set') === cur);
+    });
+  }
+
   function setTheme(t) {
+    if (THEMES.indexOf(t) < 0) t = 'tg-dark';
     document.documentElement.setAttribute('data-theme', t);
     localStorage.setItem(THEME_KEY, t);
     applyHljsTheme();
+    syncLoginThemeChips();
     if ($('#cfg-yaml') && $('#cfg-yaml').textContent && window.hljs) {
       hljs.highlightElement($('#cfg-yaml'));
     }
+  }
+
+  function cycleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme') || 'tg-dark';
+    const i = THEMES.indexOf(cur);
+    const next = THEMES[(i + 1) % THEMES.length];
+    setTheme(next);
+    toast('Тема: ' + (THEME_LABELS[next] || next));
   }
 
   function showApp(show) {
@@ -936,9 +1136,12 @@
 
   $('#btn-logout').addEventListener('click', logout);
 
-  $('#btn-theme').addEventListener('click', () => {
-    const t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    setTheme(t);
+  $('#btn-theme').addEventListener('click', cycleTheme);
+
+  $('#login-theme-chips').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-theme-set]');
+    if (!b) return;
+    setTheme(b.getAttribute('data-theme-set'));
   });
 
   $('#btn-menu').addEventListener('click', () => {
@@ -991,15 +1194,18 @@
       await navigator.clipboard.writeText(t);
       toast('Скопировано в буфер');
     } catch (e) {
-      toast('Не удалось скопировать (браузер заблокировал буфер)', true);
+      toast('Не удалось скопировать', true);
     }
   });
 
-  /* Init */
   (function initTheme() {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved === 'light' || saved === 'dark') setTheme(saved);
-    else setTheme('dark');
+    let saved = localStorage.getItem(THEME_KEY);
+    if (THEMES.indexOf(saved) < 0) {
+      if (saved === 'dark') saved = 'tg-dark';
+      else if (saved === 'light') saved = 'light';
+      else saved = 'tg-dark';
+    }
+    setTheme(saved);
   })();
 
   if (localStorage.getItem(JWT_KEY)) {
