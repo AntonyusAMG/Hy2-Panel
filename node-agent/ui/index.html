@@ -916,27 +916,28 @@
   <div id="modal-uri" class="modal-backdrop hidden">
     <div class="modal" style="max-width:min(560px,100%)">
       <h3>Ссылка для клиента</h3>
-      <p class="lead" style="font-size:0.88rem;color:var(--muted);margin:0 0 14px;line-height:1.5;">
-        <span class="mono">hysteria2://</span> — ручной импорт. Имя в приложении берётся из части после <span class="mono">#</span> (регион, нода, ID).
+      <p class="lead" style="font-size:0.85rem;color:var(--amber);margin:0 0 12px;line-height:1.5;border-left:3px solid var(--amber);padding-left:10px;">
+        Чтобы в HAPP появились название группы, шкала трафика и дата — добавьте <strong>подписку по ссылке ниже</strong> (не копируйте одну строку <span class="mono">hysteria2://</span>).
+        Старую подписку в HAPP удалите → «+» → вставьте URL → обновите подписку.
       </p>
-      <label class="field" style="display:block;margin-bottom:10px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">Одна строка (как раньше)</span>
-        <textarea id="uri-out" class="inp mono" readonly rows="3" style="width:100%;resize:vertical;min-height:72px;font-size:0.78rem;"></textarea>
-      </label>
       <div id="uri-sub-block" class="hidden">
-        <label class="field" style="display:block;margin-bottom:8px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">Подписка HAPP (как у «коммерческих» VPN)</span>
+        <label class="field" style="display:block;margin-bottom:8px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">Ссылка подписки для HAPP (главное)</span>
           <textarea id="uri-sub-out" class="inp mono" readonly rows="2" style="width:100%;resize:vertical;min-height:56px;font-size:0.76rem;"></textarea>
         </label>
-        <p id="uri-sub-hint" class="lead" style="font-size:0.8rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
-          В HAPP: Subscriptions → + → вставьте эту <strong>HTTPS-ссылку</strong>. В группе появятся название (до 25 симв.), трафик и дата из <span class="mono">subscription-userinfo</span>.
+        <p id="uri-sub-hint" class="lead" style="font-size:0.78rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
+          На iOS нужен <strong>HTTPS</strong> к панели (или укажите <span class="mono">public_base_url</span> с https в config.json агента). Если подписка не подтягивается — откройте ссылку в Safari и проверьте, что отдаётся текст с <span class="mono">#profile-title</span>.
         </p>
       </div>
       <p id="uri-no-sub" class="lead hidden" style="font-size:0.8rem;color:var(--amber);margin:0 0 12px;line-height:1.45;">
-        Публичная подписка отключена: задайте <span class="mono">happ_subscription_key</span> в config.json агента и перезапустите hy2-agent.
+        Нет ключа подписки: проверьте <span class="mono">jwt_secret</span> в config агента.
       </p>
+      <label class="field" style="display:block;margin-bottom:10px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">Одна строка hysteria2 (ручной импорт, без «красивой» карточки)</span>
+        <textarea id="uri-out" class="inp mono" readonly rows="3" style="width:100%;resize:vertical;min-height:72px;font-size:0.78rem;"></textarea>
+      </label>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
         <button type="button" class="btn btn-ghost" id="uri-close">Закрыть</button>
-        <button type="button" class="btn btn-ghost hidden" id="uri-copy-sub">Копировать ссылку подписки</button>
-        <button type="button" class="btn btn-primary" id="uri-copy">Копировать строку</button>
+        <button type="button" class="btn btn-primary hidden" id="uri-copy-sub">Копировать ссылку подписки</button>
+        <button type="button" class="btn btn-ghost" id="uri-copy">Копировать строку</button>
       </div>
     </div>
   </div>

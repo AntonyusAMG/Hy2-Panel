@@ -4,6 +4,7 @@ HY2 Node Agent — FastAPI. Конфиг: /opt/hy2-agent/config.json (путь �
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import re
@@ -275,7 +276,26 @@ def _happ_cfg() -> dict[str, Any]:
 
 
 def _happ_subscription_key() -> str:
-    return str(_config.get("happ_subscription_key") or "").strip()
+    """Ключ ?k= для /sub/…. Явный happ_subscription_key или стабильный производный от jwt_secret."""
+    k = str(_config.get("happ_subscription_key") or "").strip()
+    if k:
+        return k
+    js = str(_config.get("jwt_secret") or "")
+    if len(js) < 8:
+        return ""
+    return hashlib.sha256((js + "|hy2-happ-subscription-v1").encode("utf-8")).hexdigest()
+
+
+def _public_base_url(request: Request) -> str:
+    """Ссылка для клиента: public_base_url в config или X-Forwarded-* за reverse-proxy."""
+    pb = str(_config.get("public_base_url") or "").strip().rstrip("/")
+    if pb:
+        return pb
+    xf = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip()
+    xhost = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
+    if xf and xhost:
+        return f"{xf}://{xhost}"
+    return str(request.base_url).rstrip("/")
 
 
 def _trunc_happ_title(s: str, max_len: int = 25) -> str:
@@ -368,13 +388,13 @@ async def client_uri(telegram_id: str, request: Request, _: dict = Depends(verif
     """Готовая hysteria2:// и URL подписки HAPP (формат profile-title + subscription-userinfo)."""
     tid = _validate_tg_id(telegram_id)
     d = _build_hysteria2_uri_dict(tid)
-    base = str(request.base_url).rstrip("/")
+    base = _public_base_url(request)
     key = _happ_subscription_key()
     d["happ_subscription_url"] = f"{base}/sub/{tid}?k={quote(key, safe='')}" if key else None
     d["happ_subscription_hint"] = (
-        "В HAPP: Subscriptions → + → вставьте ссылку подписки (не одну строку hysteria2)."
+        "В HAPP: Subscriptions → + → вставьте только эту HTTPS-ссылку. Удалите старую подписку и добавьте заново, затем «Обновить». Одна строка hysteria2 не даёт блок с трафиком."
         if key
-        else "Добавьте в /opt/hy2-agent/config.json поля happ_subscription_key и при желании happ { profile_title, region_label, … }"
+        else "Задайте jwt_secret в config.json агента (нужен для ключа подписки)."
     )
     return d
 
@@ -412,6 +432,7 @@ async def happ_subscription_export(
         headers={
             "subscription-userinfo": info_hdr,
             "Cache-Control": "no-store",
+            "Content-Disposition": 'inline; filename="subscription.txt"',
         },
     )
 
