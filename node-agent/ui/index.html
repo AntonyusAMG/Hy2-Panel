@@ -156,12 +156,10 @@
       position: absolute;
       top: 14px;
       right: 14px;
-      z-index: 10;
+      z-index: 20;
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
       justify-content: flex-end;
-      max-width: min(100% - 28px, 520px);
+      max-width: calc(100% - 28px);
     }
     .login-page-center {
       flex: 1;
@@ -214,41 +212,146 @@
       margin-top: 6px;
       line-height: 1.45;
     }
-    #login-theme-chips button {
-      border: 1px solid var(--border);
-      background: color-mix(in srgb, var(--bg2) 85%, transparent);
-      color: var(--muted);
-      padding: 5px 12px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.2s, opacity 0.2s;
-      opacity: 0.85;
+    .login-theme-dd {
+      position: relative;
     }
-    #login-theme-chips button:hover {
+    .login-theme-dd-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px 10px 12px;
+      border-radius: 14px;
+      border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+      background:
+        linear-gradient(145deg, color-mix(in srgb, var(--bg1) 92%, transparent), color-mix(in srgb, var(--bg2) 75%, transparent));
+      box-shadow:
+        0 1px 0 color-mix(in srgb, var(--txt) 6%, transparent) inset,
+        0 12px 32px var(--shadow),
+        0 0 0 1px color-mix(in srgb, var(--txt) 4%, transparent) inset;
       color: var(--txt);
-      border-color: var(--accent);
-      opacity: 1;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.25s, border-color 0.2s, background 0.25s;
+    }
+    .login-theme-dd-trigger:hover {
+      border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+      box-shadow:
+        0 1px 0 color-mix(in srgb, var(--txt) 8%, transparent) inset,
+        0 16px 40px var(--shadow),
+        0 0 24px color-mix(in srgb, var(--accent) 15%, transparent);
       transform: translateY(-1px);
     }
-    #login-theme-chips button.active {
-      opacity: 1;
-      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 35%, var(--bg2)), color-mix(in srgb, var(--accent) 15%, var(--bg2)));
+    .login-theme-dd-trigger:focus-visible {
+      outline: none;
+      box-shadow:
+        0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent),
+        0 12px 32px var(--shadow);
+    }
+    .login-theme-dd.open .login-theme-dd-trigger {
       border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+      background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 12%, var(--bg1)), var(--bg2));
+    }
+    .login-theme-dd-ico {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 35%, transparent), color-mix(in srgb, var(--accent) 8%, transparent));
       color: var(--accent2);
-      transform: scale(1.03);
+      flex-shrink: 0;
     }
-    :root[data-theme="light"] #login-theme-chips button.active {
-      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 80%, #1e40af));
-      border-color: transparent;
-      color: #fff;
+    .login-theme-dd-ico svg {
+      width: 18px;
+      height: 18px;
+      opacity: 0.95;
     }
-    :root[data-theme="accent-violet"] #login-theme-chips button.active {
-      background: linear-gradient(135deg, #7c4dff, #651fff);
-      border-color: transparent;
-      color: #fff;
+    .login-theme-dd-label {
+      min-width: 5.5em;
+      text-align: left;
+    }
+    .login-theme-dd-chevron {
+      flex-shrink: 0;
+      opacity: 0.55;
+      transition: transform 0.25s ease, opacity 0.2s;
+    }
+    .login-theme-dd.open .login-theme-dd-chevron {
+      transform: rotate(180deg);
+      opacity: 0.9;
+    }
+    .login-theme-dd-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 8px);
+      min-width: 220px;
+      margin: 0;
+      padding: 6px;
+      list-style: none;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg1) 94%, transparent);
+      backdrop-filter: blur(20px) saturate(160%);
+      box-shadow: 0 20px 50px var(--shadow), 0 0 0 1px color-mix(in srgb, var(--txt) 5%, transparent) inset;
+      z-index: 30;
+    }
+    .login-theme-dd-menu::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 12px;
+      right: 12px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 40%, transparent), transparent);
+      border-radius: 14px 14px 0 0;
+      pointer-events: none;
+    }
+    .login-theme-dd-opt {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      padding: 10px 12px 10px 36px;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--txt);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.15s, color 0.15s;
+    }
+    .login-theme-dd-opt:hover {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      color: var(--accent2);
+    }
+    .login-theme-dd-opt.active {
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      font-weight: 700;
+      color: var(--accent2);
+    }
+    .login-theme-dd-opt.active::before {
+      content: "";
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      width: 8px;
+      height: 8px;
+      margin-top: -4px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+    :root[data-theme="light"] .login-theme-dd-opt.active::before {
+      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #1e3a8a));
+    }
+    :root[data-theme="accent-violet"] .login-theme-dd-opt.active::before {
+      background: linear-gradient(135deg, #b47aff, #7c4dff);
     }
     .login-card h1 {
       font-family: Syne, sans-serif;
@@ -601,11 +704,28 @@
     <div class="login-bg" aria-hidden="true"></div>
     <div class="login-glow login-glow1" aria-hidden="true"></div>
     <div class="login-glow login-glow2" aria-hidden="true"></div>
-    <div class="login-theme-bar" id="login-theme-chips" role="group" aria-label="Тема оформления">
-      <button type="button" data-theme-set="tg-dark">TG Dark</button>
-      <button type="button" data-theme-set="crm-soft">CRM soft</button>
-      <button type="button" data-theme-set="light">Светлая</button>
-      <button type="button" data-theme-set="accent-violet">Violet</button>
+    <div class="login-theme-bar">
+      <div class="login-theme-dd" id="login-theme-chips">
+        <button type="button" class="login-theme-dd-trigger" id="btn-login-theme" aria-expanded="false" aria-haspopup="listbox" aria-controls="login-theme-menu">
+          <span class="login-theme-dd-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 2.25a9.75 9.75 0 100 19.5 9.75 9.75 0 000-19.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              <path d="M12 2.25v19.5" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="8" cy="13" r="2" fill="currentColor" opacity="0.45"/>
+              <circle cx="12" cy="8" r="2" fill="currentColor" opacity="0.55"/>
+              <circle cx="16" cy="13" r="2" fill="currentColor" opacity="0.35"/>
+            </svg>
+          </span>
+          <span class="login-theme-dd-label" id="login-theme-current-label">TG Dark</span>
+          <svg class="login-theme-dd-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul class="login-theme-dd-menu hidden" id="login-theme-menu" role="listbox" aria-label="Тема оформления">
+          <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="tg-dark">TG Dark</button></li>
+          <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="crm-soft">CRM soft</button></li>
+          <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="light">Светлая</button></li>
+          <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="accent-violet">Violet</button></li>
+        </ul>
+      </div>
     </div>
     <div class="login-page-center">
       <div class="login-card">
@@ -750,7 +870,7 @@
   const THEME_KEY = 'hy2_theme';
   const TRAFFIC_HIST_KEY = 'hy2_traffic_daily_v1';
   const THEMES = ['tg-dark', 'crm-soft', 'light', 'accent-violet'];
-  const THEME_LABELS = { 'tg-dark': 'Telegram', 'crm-soft': 'CRM soft', 'light': 'Светлая', 'accent-violet': 'Violet' };
+  const THEME_LABELS = { 'tg-dark': 'TG Dark', 'crm-soft': 'CRM soft', 'light': 'Светлая', 'accent-violet': 'Violet' };
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1148,9 +1268,30 @@
 
   function syncLoginThemeChips() {
     const cur = document.documentElement.getAttribute('data-theme') || 'tg-dark';
+    const lbl = $('#login-theme-current-label');
+    if (lbl) lbl.textContent = THEME_LABELS[cur] || cur;
     $$('#login-theme-chips [data-theme-set]').forEach((b) => {
       b.classList.toggle('active', b.getAttribute('data-theme-set') === cur);
     });
+  }
+
+  function closeLoginThemeMenu() {
+    const m = $('#login-theme-menu');
+    const tr = $('#btn-login-theme');
+    const wrap = document.querySelector('#login-theme-chips.login-theme-dd');
+    if (m && !m.classList.contains('hidden')) m.classList.add('hidden');
+    if (tr) tr.setAttribute('aria-expanded', 'false');
+    if (wrap) wrap.classList.remove('open');
+  }
+
+  function toggleLoginThemeMenu() {
+    const m = $('#login-theme-menu');
+    const tr = $('#btn-login-theme');
+    const wrap = document.querySelector('#login-theme-chips.login-theme-dd');
+    if (!m || !tr || !wrap) return;
+    const nowHidden = m.classList.toggle('hidden');
+    tr.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
+    wrap.classList.toggle('open', !nowHidden);
   }
 
   function setTheme(t) {
@@ -1208,10 +1349,24 @@
 
   $('#btn-theme').addEventListener('click', cycleTheme);
 
+  $('#btn-login-theme').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleLoginThemeMenu();
+  });
+
   $('#login-theme-chips').addEventListener('click', (e) => {
     const b = e.target.closest('[data-theme-set]');
-    if (!b) return;
+    if (!b || b.id === 'btn-login-theme') return;
     setTheme(b.getAttribute('data-theme-set'));
+    closeLoginThemeMenu();
+  });
+
+  document.addEventListener('click', () => {
+    closeLoginThemeMenu();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeLoginThemeMenu();
   });
 
   $('#btn-menu').addEventListener('click', () => {
