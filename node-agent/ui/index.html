@@ -482,6 +482,20 @@
     </div>
   </div>
 
+  <div id="modal-uri" class="modal-backdrop hidden">
+    <div class="modal" style="max-width:min(560px,100%)">
+      <h3>Ссылка для клиента</h3>
+      <p class="lead" style="font-size:0.88rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
+        Формат <span class="mono">hysteria2://</span> — для HAPP, v2rayN и других клиентов. Строка содержит <strong>пароль</strong>, не отправляйте её в открытых чатах.
+      </p>
+      <textarea id="uri-out" class="inp mono" readonly rows="4" style="width:100%;resize:vertical;min-height:100px;font-size:0.8rem;"></textarea>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-ghost" id="uri-close">Закрыть</button>
+        <button type="button" class="btn btn-primary" id="uri-copy">Копировать</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
@@ -765,6 +779,7 @@
           '<td class="muted">—</td><td class="muted">—</td>' +
           '<td><span class="status-pill ok">в конфиге</span></td>' +
           '<td style="white-space:nowrap">' +
+          '<button type="button" class="btn btn-ghost" data-act="link" data-id="' + id + '">Ссылка</button> ' +
           '<button type="button" class="btn btn-ghost" data-act="reset" data-id="' + id + '">Сброс трафика</button> ' +
           '<button type="button" class="btn btn-danger" data-act="del" data-id="' + id + '">Удалить</button>' +
           '</td>';
@@ -786,6 +801,15 @@
               await api('/traffic/' + encodeURIComponent(id) + '/reset', { method: 'POST' });
               toast('Сброс запрошен');
               loadUsers();
+            } catch (e) {
+              toast(String(e.message || e), true);
+            }
+          }
+          if (btn.dataset.act === 'link') {
+            try {
+              const r = await api('/users/' + encodeURIComponent(id) + '/client-uri');
+              $('#uri-out').value = r.uri || '';
+              $('#modal-uri').classList.remove('hidden');
             } catch (e) {
               toast(String(e.message || e), true);
             }
@@ -956,6 +980,18 @@
       loadUsers();
     } catch (e) {
       toast(String(e.message || e), true);
+    }
+  });
+
+  $('#uri-close').addEventListener('click', () => $('#modal-uri').classList.add('hidden'));
+  $('#uri-copy').addEventListener('click', async () => {
+    const t = $('#uri-out').value;
+    if (!t) return;
+    try {
+      await navigator.clipboard.writeText(t);
+      toast('Скопировано в буфер');
+    } catch (e) {
+      toast('Не удалось скопировать (браузер заблокировал буфер)', true);
     }
   });
 

@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import re
+from urllib.parse import quote
 import subprocess
 import time
 from datetime import datetime, timedelta, timezone
@@ -209,6 +210,62 @@ async def list_users(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
     else:
         users = []
     return {"users": users}
+
+
+def _hysteria_listen_port(y: dict[str, Any]) -> int:
+    listen = y.get("listen", ":443")
+    if isinstance(listen, (int, float)):
+        return int(listen)
+    s = str(listen).strip()
+    if not s:
+        return 443
+    if ":" in s:
+        tail = s.rsplit(":", 1)[-1].rstrip("]")
+        try:
+            return int(tail)
+        except ValueError:
+            pass
+    return 443
+
+
+def _hysteria_public_domain(y: dict[str, Any]) -> str:
+    acme = y.get("acme") or {}
+    doms = acme.get("domains")
+    if isinstance(doms, list) and doms:
+        return str(doms[0]).strip()
+    return ""
+
+
+@app.get("/users/{telegram_id}/client-uri")
+async def client_uri(telegram_id: str, _: dict = Depends(verify_bearer)) -> dict[str, Any]:
+    """Готовая hysteria2:// ссылка для клиентов (HAPP и др.); пароль берётся из config.yaml."""
+    tid = _validate_tg_id(telegram_id)
+    y = _read_hysteria_yaml()
+    auth = y.get("auth") or {}
+    up = auth.get("userpass") or {}
+    if not isinstance(up, dict) or tid not in up:
+        raise HTTPException(status_code=404, detail="User not found")
+    password = str(up[tid])
+    domain = _hysteria_public_domain(y)
+    if not domain:
+        raise HTTPException(
+            status_code=503,
+            detail="В конфиге Hysteria нет acme.domains — нечего подставить в ссылку",
+        )
+    port = _hysteria_listen_port(y)
+    node_name = str(_config.get("node_name", "HY2"))
+    tid_q = quote(tid, safe="")
+    pw_q = quote(password, safe="")
+    sni_q = quote(domain, safe="")
+    frag_q = quote(node_name, safe="")
+    uri = f"hysteria2://{tid_q}:{pw_q}@{domain}:{port}/?sni={sni_q}&insecure=0#{frag_q}"
+    return {
+        "uri": uri,
+        "telegram_id": tid,
+        "domain": domain,
+        "port": port,
+        "node_name": node_name,
+    }
 
 
 @app.get("/users/{telegram_id}")
