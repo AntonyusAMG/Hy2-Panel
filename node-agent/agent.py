@@ -8,7 +8,7 @@ import hashlib
 import json
 import os
 import re
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 import subprocess
 import time
 from datetime import datetime, timedelta, timezone
@@ -265,10 +265,23 @@ def _hysteria_listen_port(y: dict[str, Any]) -> int:
 
 
 def _hysteria_public_domain(y: dict[str, Any]) -> str:
+    """Домен для hysteria2:// (SNI): acme.domains[0], либо tls + public_base_url агента, либо public_domain в YAML."""
     acme = y.get("acme") or {}
     doms = acme.get("domains")
     if isinstance(doms, list) and doms:
-        return str(doms[0]).strip()
+        d = str(doms[0]).strip()
+        if d:
+            return d
+    for key in ("public_domain", "server_name"):
+        v = (y.get(key) or "").strip()
+        if v:
+            return v
+    pb = str(_config.get("public_base_url") or "").strip().rstrip("/")
+    if pb:
+        u = pb if "://" in pb else f"https://{pb}"
+        host = urlparse(u).hostname
+        if host:
+            return host
     return ""
 
 
@@ -409,7 +422,10 @@ def _build_hysteria2_uri_dict(tid: str) -> dict[str, Any]:
     if not domain:
         raise HTTPException(
             status_code=503,
-            detail="В конфиге Hysteria нет acme.domains — нечего подставить в ссылку",
+            detail=(
+                "Не задан домен для ссылки: укажите acme.domains в config.yaml Hysteria, "
+                "или public_domain в YAML, или public_base_url (https://домен) в config.json агента."
+            ),
         )
     port = _hysteria_listen_port(y)
     node_name = str(_config.get("node_name", "HY2"))
