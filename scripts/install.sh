@@ -37,16 +37,18 @@ check_ubuntu_24() {
   [[ "${VERSION_ID:-}" == "24.04" ]] || die "Требуется Ubuntu 24.04 LTS (сейчас: ${VERSION_ID:-unknown})"
 }
 
-port_443_free() {
-  if command -v ss >/dev/null 2>&1; then
-    if ss -H -lnp 2>/dev/null | grep -qE ':443(\s|$)'; then
-      die "Порт 443 уже занят. Остановите сервис, слушающий 443, или смените конфигурацию."
-    fi
-  elif command -v netstat >/dev/null 2>&1; then
-    if netstat -tulnp 2>/dev/null | grep -qE ':443\s'; then
-      die "Порт 443 уже занят."
-    fi
+# Hysteria 2 использует в основном UDP :443; Apache — TCP :443. Конфликт только если чужой процесс занял TCP 443.
+check_tcp443_available() {
+  local line
+  line="$(ss -H -tlnp 2>/dev/null | grep -E ':443(\s|$)' || true)"
+  if [[ -z "$line" ]]; then
+    return 0
   fi
+  if echo "$line" | grep -qE 'apache2|httpd'; then
+    info "TCP 443 уже слушает Apache — продолжаем (certbot/HTTPS)."
+    return 0
+  fi
+  die "TCP 443 занят (нужен для HTTPS Apache). Проверьте: ss -tlnp | grep 443"
 }
 
 usage() {
@@ -63,10 +65,10 @@ usage() {
   DOMAIN      — домен для ACME (A-запись на этот сервер)
 
 Переменные окружения (опционально):
-  ACME_EMAIL  — email для Let's Encrypt / ZeroSSL (если не задан — спросит интерактивно)
-  ACME_CA     — letsencrypt (по умолчанию) или zerossl
+  ACME_EMAIL  — email для Let's Encrypt (если не задан — спросит интерактивно)
 
-Сертификаты: Hysteria 2 сам получает и продлевает TLS (встроенный ACME). Отдельный certbot не нужен.
+Панель по HTTPS: Apache (TCP 443) → reverse-proxy на агент; сертификат Let's Encrypt через certbot (автопродление).
+Hysteria 2 (QUIC) слушает UDP 443 с теми же сертификатами из файлов (TCP 443 не занимает).
 
 Нелокальные копии agent/ui берутся из: ${NODE_AGENT_SRC}
 EOF
@@ -108,9 +110,6 @@ info "Домен:      $DOMAIN"
 info "Порт агента: $AGENT_PORT"
 echo ""
 
-ACME_CA="${ACME_CA:-letsencrypt}"
-[[ "$ACME_CA" == "letsencrypt" || "$ACME_CA" == "zerossl" ]] || die "ACME_CA должен быть letsencrypt или zerossl (сейчас: $ACME_CA)"
-
 if [[ -n "${ACME_EMAIL:-}" ]]; then
   info "ACME email: $ACME_EMAIL (из окружения ACME_EMAIL)"
 else
@@ -139,7 +138,7 @@ fi
 read -r -p "Продолжить установку? [y/N]: " CONFIRM
 [[ "${CONFIRM,,}" == "y" || "${CONFIRM,,}" == "yes" ]] || die "Отменено пользователем."
 
-port_443_free
+check_tcp443_available
 
 info "Обновление списка пакетов..."
 apt-get update -qq
@@ -147,8 +146,9 @@ apt-get update -qq
 info "Обновление установленных пакетов (может занять время)..."
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
 
-info "Установка зависимостей..."
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl python3 python3-pip python3-venv ufw git openssl dnsutils
+info "Установка зависимостей (в т.ч. Apache + certbot для HTTPS панели)..."
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl python3 python3-pip python3-venv ufw git openssl dnsutils \
+  apache2 certbot python3-certbot-apache
 
 info "Проверка DNS для ACME (A-запись должна указывать на этот сервер)..."
 RRS="$(dig +short A "$DOMAIN" 2>/dev/null | head -n1)"
@@ -179,47 +179,22 @@ fi
 
 STATS_SECRET="$(openssl rand -hex 32)"
 JWT_SECRET="$(openssl rand -hex 32)"
-ACME_STORAGE_DIR="/var/lib/hysteria/acme"
+HY2_TLS_DIR="/var/lib/hysteria/letsencrypt"
 # HY2 ≥2.7 не принимает пустой userpass — временный пользователь, удалите в панели после добавления своих
 HY2_PLACEHOLDER_TG="${HY2_PLACEHOLDER_TG:-999999999}"
 PLACEHOLDER_USERPASS="$(openssl rand -hex 16)"
 
 info "Создание каталогов..."
-mkdir -p /etc/hysteria /opt/hy2-agent/ui /var/log/hy2-agent "$ACME_STORAGE_DIR"
-# Hysteria работает от пользователя hysteria (создаётся get.hy2.sh) — нужна запись в каталог ACME
+mkdir -p /etc/hysteria /opt/hy2-agent/ui /var/log/hy2-agent "$HY2_TLS_DIR"
 if id hysteria &>/dev/null; then
-  chown -R hysteria:hysteria "$ACME_STORAGE_DIR" || warn "chown ${ACME_STORAGE_DIR} не удался"
+  chown -R hysteria:hysteria "$HY2_TLS_DIR" || warn "chown ${HY2_TLS_DIR} не удался"
 else
-  warn "Пользователь hysteria не найден — после установки HY2 проверьте права на ${ACME_STORAGE_DIR}"
+  warn "Пользователь hysteria не найден — после установки HY2 проверьте права на ${HY2_TLS_DIR}"
 fi
 
-info "Запись /etc/hysteria/config.yaml (встроенный ACME: ${ACME_CA}, challenge TLS-ALPN)..."
-cat > /etc/hysteria/config.yaml <<YAML
-listen: :443
-
-acme:
-  domains:
-    - ${DOMAIN}
-  email: ${ACME_EMAIL}
-  ca: ${ACME_CA}
-  type: tls
-  dir: ${ACME_STORAGE_DIR}
-
-auth:
-  type: userpass
-  userpass:
-    "${HY2_PLACEHOLDER_TG}": "${PLACEHOLDER_USERPASS}"
-
-masquerade:
-  type: proxy
-  proxy:
-    url: https://news.ycombinator.com
-    rewriteHost: true
-
-trafficStats:
-  listen: :25413
-  secret: ${STATS_SECRET}
-YAML
+info "Остановка hysteria-server до выпуска сертификатов (конфиг запишем после Let's Encrypt)..."
+systemctl stop hysteria-server.service 2>/dev/null || true
+systemctl disable hysteria-server.service 2>/dev/null || true
 
 info "Python venv и зависимости агента..."
 python3 -m venv /opt/hy2-agent/venv
@@ -247,6 +222,7 @@ export HY2_CFG_STATS_SECRET="$STATS_SECRET"
 export HY2_CFG_LOGIN="$PANEL_LOGIN"
 export HY2_CFG_PASSWORD_HASH="$PASSWORD_HASH"
 export HY2_CFG_JWT_SECRET="$JWT_SECRET"
+export HY2_CFG_DOMAIN="$DOMAIN"
 HAPP_SUB_KEY="$(openssl rand -hex 24)"
 export HY2_CFG_HAPP_SUB_KEY="$HAPP_SUB_KEY"
 
@@ -254,6 +230,8 @@ info "Запись /opt/hy2-agent/config.json..."
 /opt/hy2-agent/venv/bin/python3 <<'PY'
 import json, os
 node = os.environ.get("HY2_CFG_NODE_NAME", "VPN") or "VPN"
+dom = (os.environ.get("HY2_CFG_DOMAIN") or "").strip()
+public_base_url = f"https://{dom}" if dom else ""
 cfg = {
     "node_name": node,
     "master_url": os.environ["HY2_CFG_MASTER_URL"],
@@ -266,6 +244,7 @@ cfg = {
     "password_hash": os.environ["HY2_CFG_PASSWORD_HASH"],
     "jwt_secret": os.environ["HY2_CFG_JWT_SECRET"],
     "happ_subscription_key": os.environ.get("HY2_CFG_HAPP_SUB_KEY", ""),
+    "public_base_url": public_base_url,
     "happ": {
         "profile_title": "",
         "country_code": "",
@@ -283,26 +262,158 @@ with open("/opt/hy2-agent/config.json", "w", encoding="utf-8") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
 PY
 
-unset HY2_CFG_NODE_NAME HY2_CFG_MASTER_URL HY2_CFG_TOKEN HY2_CFG_AGENT_PORT HY2_CFG_STATS_SECRET HY2_CFG_LOGIN HY2_CFG_PASSWORD_HASH HY2_CFG_JWT_SECRET HY2_CFG_HAPP_SUB_KEY
+unset HY2_CFG_NODE_NAME HY2_CFG_MASTER_URL HY2_CFG_TOKEN HY2_CFG_AGENT_PORT HY2_CFG_STATS_SECRET HY2_CFG_LOGIN HY2_CFG_PASSWORD_HASH HY2_CFG_JWT_SECRET HY2_CFG_HAPP_SUB_KEY HY2_CFG_DOMAIN
 
 info "Установка systemd: hy2-agent.service..."
 cp -f "$NODE_AGENT_SRC/hy2-agent.service" /etc/systemd/system/hy2-agent.service
-# Порт из переменной (по умолчанию 4000)
 sed -i "s/--port 4000/--port ${AGENT_PORT}/g" /etc/systemd/system/hy2-agent.service
 
-info "Настройка UFW..."
+info "Настройка UFW (HTTP/HTTPS для Apache и панели)..."
 ufw allow 22/tcp
+ufw allow 80/tcp
 ufw allow 443/tcp
 ufw allow 443/udp
 ufw allow "${AGENT_PORT}"/tcp
 ufw --force enable
 
-info "Запуск сервисов..."
+info "Apache: модули и виртуальный хост (HTTP → агент, затем HTTPS после сертификата)..."
+a2enmod ssl proxy proxy_http headers rewrite
+a2dissite 000-default.conf 2>/dev/null || true
+
+mkdir -p /var/www/html/.well-known/acme-challenge
+cat > /etc/apache2/sites-available/hy2-panel-80.conf <<EOF
+<VirtualHost *:80>
+    ServerName ${DOMAIN}
+    DocumentRoot /var/www/html
+    Alias /.well-known/acme-challenge/ /var/www/html/.well-known/acme-challenge/
+    <Directory /var/www/html/.well-known/acme-challenge>
+        Require all granted
+        Options None
+    </Directory>
+    ProxyPreserveHost On
+    ProxyPass /.well-known/acme-challenge/ !
+    ProxyPass / http://127.0.0.1:${AGENT_PORT}/
+    ProxyPassReverse / http://127.0.0.1:${AGENT_PORT}/
+    RequestHeader set X-Forwarded-Proto "http"
+    RequestHeader set X-Forwarded-Port "80"
+</VirtualHost>
+EOF
+a2ensite hy2-panel-80.conf
+apache2ctl configtest
+
+systemctl enable apache2.service
+systemctl restart apache2.service
+
+info "Запуск hy2-agent..."
 systemctl daemon-reload
-systemctl enable hysteria-server.service
 systemctl enable hy2-agent.service
-systemctl restart hysteria-server.service || warn "hysteria-server не запустился (часто DNS/ACME — проверьте домен и логи)"
 systemctl restart hy2-agent.service
+
+SKIP_LE_CERT=0
+if [[ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" && -f "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" ]]; then
+  info "Сертификат Let's Encrypt для ${DOMAIN} уже есть — certbot пропускаем."
+  SKIP_LE_CERT=1
+fi
+
+if [[ "$SKIP_LE_CERT" -eq 0 ]]; then
+  info "Получение сертификата Let's Encrypt (certbot + Apache)..."
+  certbot certonly --apache -d "${DOMAIN}" --non-interactive --agree-tos -m "${ACME_EMAIL}" --no-eff-email \
+    || die "certbot не смог получить сертификат (проверьте DNS A→этот сервер и порт 80 снаружи)."
+fi
+
+[[ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]] || die "Нет fullchain.pem для ${DOMAIN}"
+[[ -f "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" ]] || die "Нет privkey.pem для ${DOMAIN}"
+
+info "Копирование сертификатов для Hysteria (UDP 443)..."
+cp -L "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" "${HY2_TLS_DIR}/fullchain.pem"
+cp -L "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" "${HY2_TLS_DIR}/privkey.pem"
+chown hysteria:hysteria "${HY2_TLS_DIR}/fullchain.pem" "${HY2_TLS_DIR}/privkey.pem" 2>/dev/null || chown root:root "${HY2_TLS_DIR}/"*.pem
+chmod 640 "${HY2_TLS_DIR}/fullchain.pem"
+chmod 600 "${HY2_TLS_DIR}/privkey.pem"
+
+info "Apache: HTTPS reverse-proxy и редирект с HTTP..."
+cat > /etc/apache2/sites-available/hy2-panel-ssl.conf <<EOF
+<IfModule mod_ssl.c>
+<VirtualHost *:443>
+    ServerName ${DOMAIN}
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/${DOMAIN}/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/${DOMAIN}/privkey.pem
+    Include /etc/letsencrypt/options-ssl-apache.conf
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:${AGENT_PORT}/
+    ProxyPassReverse / http://127.0.0.1:${AGENT_PORT}/
+    RequestHeader set X-Forwarded-Proto "https"
+    RequestHeader set X-Forwarded-Port "443"
+</VirtualHost>
+</IfModule>
+EOF
+a2ensite hy2-panel-ssl.conf
+
+mkdir -p /var/www/html/.well-known/acme-challenge
+cat > /etc/apache2/sites-available/hy2-panel-80.conf <<EOF
+<VirtualHost *:80>
+    ServerName ${DOMAIN}
+    DocumentRoot /var/www/html
+    Alias /.well-known/acme-challenge/ /var/www/html/.well-known/acme-challenge/
+    <Directory /var/www/html/.well-known/acme-challenge>
+        Require all granted
+        Options None
+    </Directory>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/\\.well-known/acme-challenge/
+    RewriteRule ^ https://${DOMAIN}%{REQUEST_URI} [R=301,L]
+</VirtualHost>
+EOF
+apache2ctl configtest
+systemctl reload apache2.service
+
+info "Запись /etc/hysteria/config.yaml (TLS из файлов Let's Encrypt, без встроенного ACME)..."
+cat > /etc/hysteria/config.yaml <<YAML
+listen: :443
+
+tls:
+  cert: ${HY2_TLS_DIR}/fullchain.pem
+  key: ${HY2_TLS_DIR}/privkey.pem
+
+auth:
+  type: userpass
+  userpass:
+    "${HY2_PLACEHOLDER_TG}": "${PLACEHOLDER_USERPASS}"
+
+masquerade:
+  type: proxy
+  proxy:
+    url: https://news.ycombinator.com
+    rewriteHost: true
+
+trafficStats:
+  listen: :25413
+  secret: ${STATS_SECRET}
+YAML
+
+install -d /etc/letsencrypt/renewal-hooks/deploy
+cat > /etc/letsencrypt/renewal-hooks/deploy/99-hy2-hysteria-certs.sh <<'EOS'
+#!/bin/bash
+set -euo pipefail
+if [[ -z "${RENEWED_LINEAGE:-}" ]]; then
+  exit 0
+fi
+HY2_TLS_DIR="/var/lib/hysteria/letsencrypt"
+cp -L "${RENEWED_LINEAGE}/fullchain.pem" "${HY2_TLS_DIR}/fullchain.pem"
+cp -L "${RENEWED_LINEAGE}/privkey.pem" "${HY2_TLS_DIR}/privkey.pem"
+if id hysteria &>/dev/null; then
+  chown hysteria:hysteria "${HY2_TLS_DIR}/fullchain.pem" "${HY2_TLS_DIR}/privkey.pem" || true
+fi
+chmod 640 "${HY2_TLS_DIR}/fullchain.pem"
+chmod 600 "${HY2_TLS_DIR}/privkey.pem"
+systemctl reload hysteria-server.service || systemctl restart hysteria-server.service || true
+EOS
+chmod +x /etc/letsencrypt/renewal-hooks/deploy/99-hy2-hysteria-certs.sh
+
+info "Запуск hysteria-server..."
+systemctl enable hysteria-server.service
+systemctl restart hysteria-server.service || warn "hysteria-server не запустился — см. journalctl -u hysteria-server"
 
 PUBLIC_IP="$(curl -fsSL --connect-timeout 10 https://ipinfo.io/ip || true)"
 if [[ -z "${PUBLIC_IP:-}" ]]; then
@@ -346,13 +457,12 @@ echo -e "${GREEN}═════════════════════
 success "Установка завершена"
 echo ""
 info "Публичный IP:   $PUBLIC_IP"
-info "Агент:          http://${PUBLIC_IP}:${AGENT_PORT}/status  (Bearer TOKEN)"
-info "Веб-панель UI:  http://${PUBLIC_IP}:${AGENT_PORT}/ui"
+info "Панель (HTTPS): https://${DOMAIN}/ui"
+info "Прямой агент:   http://${PUBLIC_IP}:${AGENT_PORT}/status  (Bearer TOKEN; только для отладки)"
 info "Логин панели:   $PANEL_LOGIN"
 echo ""
-info "TLS / Let's Encrypt: встроенный ACME Hysteria 2 (CA: ${ACME_CA}, challenge: tls / TLS-ALPN на :443)."
-info "Продление сертификата выполняет сам hysteria-server; отдельный certbot и cron не нужны."
-info "Каталог ACME:   ${ACME_STORAGE_DIR}"
+info "HTTPS: Apache (TCP 443) → reverse-proxy на агент; сертификат Let's Encrypt (certbot, автопродление certbot.timer)."
+info "Hysteria: UDP 443 (QUIC), те же PEM в ${HY2_TLS_DIR}; продление LE → hook обновляет файлы и reload hysteria-server."
 warn "Временный userpass в ${HY2_PLACEHOLDER_TG} — удалите в панели после добавления реальных пользователей (HY2 не принимает пустой userpass)."
 echo ""
 systemctl --no-pager -l status hysteria-server.service || true

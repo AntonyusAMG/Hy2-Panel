@@ -3,7 +3,7 @@
   "master_url": "https://master.example.com",
   "token": "REPLACE_WITH_OPENSSL_RAND_HEX_32",
   "agent_port": 4000,
-  "public_base_url": "https://panel.example.com:4000",
+  "public_base_url": "https://panel.example.com",
   "hysteria_config": "/etc/hysteria/config.yaml",
   "hysteria_service": "hysteria-server",
   "stats_secret": "REPLACE_WITH_STATS_SECRET",

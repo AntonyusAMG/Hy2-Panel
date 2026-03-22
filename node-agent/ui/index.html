@@ -839,6 +839,10 @@
       <section id="sec-overview">
         <h2 class="section-title">Обзор</h2>
         <div class="grid-metrics">
+          <div class="metric" style="grid-column:1/-1">
+            <label>Адрес панели (HTTPS)</label>
+            <div class="val mono" style="font-size:0.78rem;word-break:break-all" id="m-panel-url">—</div>
+          </div>
           <div class="metric"><label>В конфиге</label><div class="val mono" id="m-users">—</div></div>
           <div class="metric"><label>Онлайн (HY2)</label><div class="val mono" id="m-online">—</div><div class="muted" style="font-size:0.72rem;margin-top:6px;line-height:1.35" id="m-online-sub">пользователей / подключений</div></div>
           <div class="metric"><label>Трафик сегодня</label><div class="val mono" id="m-traffic">—</div></div>
@@ -925,7 +929,7 @@
           <textarea id="uri-sub-out" class="inp mono" readonly rows="2" style="width:100%;resize:vertical;min-height:56px;font-size:0.76rem;"></textarea>
         </label>
         <p id="uri-sub-hint" class="lead" style="font-size:0.78rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
-          На iOS нужен <strong>HTTPS</strong> к панели (или укажите <span class="mono">public_base_url</span> с https в config.json агента). Если подписка не подтягивается — откройте ссылку в Safari и проверьте, что отдаётся текст с <span class="mono">#profile-title</span>.
+          Ссылка подписки должна начинаться с <span class="mono">https://</span> (Apache + Let’s Encrypt на ноде). Если не открывается — проверьте <span class="mono">public_base_url</span> в config.json агента и что в Safari отдаётся текст с <span class="mono">#profile-title</span>.
         </p>
       </div>
       <p id="uri-no-sub" class="lead hidden" style="font-size:0.8rem;color:var(--amber);margin:0 0 12px;line-height:1.45;">
@@ -1271,6 +1275,24 @@
       const el = $('#hdr-online');
       el.textContent = hyOk ? 'HY2 active' : 'HY2 ' + (st.hysteria_active || '?');
       el.className = 'status-pill mono ' + (hyOk ? 'ok' : 'bad');
+
+      const pu = $('#m-panel-url');
+      if (pu) {
+        const pb = String(st.panel_public_url || '').trim().replace(/\/$/, '');
+        const origin = window.location && window.location.origin ? String(window.location.origin).replace(/\/$/, '') : '';
+        const base = pb || origin;
+        if (base) {
+          const ui = base + '/ui';
+          const a = document.createElement('a');
+          a.href = ui;
+          a.style.color = 'var(--accent2)';
+          a.style.textDecoration = 'underline';
+          a.textContent = ui;
+          pu.replaceChildren(a);
+        } else {
+          pu.textContent = '—';
+        }
+      }
 
       $('#m-users').textContent = String(ids.length);
       const mo = $('#m-online');

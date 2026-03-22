@@ -211,8 +211,10 @@ async def status(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
     uptime_s = int(time.time() - boot)
     vm = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
+    pb = str(_config.get("public_base_url") or "").strip().rstrip("/")
     return {
         "node_name": str(_config.get("node_name", "")),
+        "panel_public_url": pb,
         "hysteria_service": _hysteria_service(),
         "hysteria_active": hysteria_active,
         "hysteria_version": _hysteria_version_line(),
