@@ -95,34 +95,6 @@ def _client_https(request: Request) -> bool:
     return request.url.scheme == "https"
 
 
-def _panel_public_hostname() -> str | None:
-    u = str(_config.get("public_base_url") or "").strip()
-    if not u:
-        return None
-    try:
-        h = urlparse(u).hostname
-        if not h:
-            return None
-        if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", h):
-            return None
-        return h.lower()
-    except Exception:
-        return None
-
-
-def _cookie_domain_for_request(request: Request) -> str | None:
-    """Кука с Domain=… для поддоменов (Safari: один хост для панели). Не ставим на IP/чужой Host."""
-    d = _panel_public_hostname()
-    if not d:
-        return None
-    host = (request.headers.get("host") or "").split(":")[0].lower()
-    if not host:
-        return None
-    if host == d or host.endswith("." + d):
-        return d
-    return None
-
-
 def _raw_token_candidates(request: Request, authorization: str | None) -> list[str]:
     """Сначала Bearer (часто из localStorage), затем cookie. Оба могут отличаться — пробуем по очереди."""
     seen: set[str] = set()
@@ -1216,15 +1188,14 @@ async def auth_me(auth: dict[str, Any] = Depends(verify_bearer)) -> dict[str, An
 @app.post("/auth/logout")
 async def auth_logout(request: Request) -> JSONResponse:
     r = JSONResponse(content={"ok": True})
-    dom = _cookie_domain_for_request(request)
     # Параметры как у set_cookie — иначе браузер может не сбросить HttpOnly
+    # Без Domain: кука только для того Host, с которого открыта панель (напр. nl2.xtinder.ru)
     r.delete_cookie(
         _UI_JWT_COOKIE,
         path="/",
         httponly=True,
         samesite="lax",
         secure=_client_https(request),
-        domain=dom,
     )
     return r
 
@@ -1265,8 +1236,8 @@ async def login(body: LoginBody, request: Request) -> JSONResponse:
     )
     payload = {"access_token": token, "token_type": "bearer", "expires_in": 86400}
     response = JSONResponse(content=payload)
-    dom = _cookie_domain_for_request(request)
     # HttpOnly: переживает сбои localStorage; JS дублирует в localStorage для Authorization
+    # Без атрибута Domain — строго для Host запроса (панель: https://nl2.xtinder.ru/ui/)
     response.set_cookie(
         key=_UI_JWT_COOKIE,
         value=token,
@@ -1275,7 +1246,6 @@ async def login(body: LoginBody, request: Request) -> JSONResponse:
         httponly=True,
         secure=_client_https(request),
         samesite="lax",
-        domain=dom,
     )
     return response
 
