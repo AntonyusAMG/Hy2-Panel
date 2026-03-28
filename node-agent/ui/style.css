@@ -664,6 +664,8 @@
       margin: 0;
       font: inherit;
       transition: background 0.18s ease, color 0.18s ease, filter 0.18s ease;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .refresh-split-left {
       width: 38px;

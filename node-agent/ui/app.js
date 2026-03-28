@@ -966,8 +966,18 @@
     closeAppThemeMenu();
   }
 
+  function closeRefreshPopover() {
+    const pop = $('#refresh-popover');
+    const menu = $('#btn-refresh-menu');
+    if (pop && !pop.classList.contains('hidden')) {
+      pop.classList.add('hidden');
+      if (menu) menu.setAttribute('aria-expanded', 'false');
+    }
+  }
+
   function toggleLoginThemeMenu() {
     closeAppThemeMenu();
+    closeRefreshPopover();
     const m = $('#login-theme-menu');
     const tr = $('#btn-login-theme');
     const wrap = document.querySelector('#login-theme-chips.login-theme-dd');
@@ -979,6 +989,7 @@
 
   function toggleAppThemeMenu() {
     closeLoginThemeMenu();
+    closeRefreshPopover();
     const m = $('#app-theme-menu');
     const tr = $('#btn-theme');
     const wrap = $('#app-theme-dd');
@@ -1057,11 +1068,13 @@
 
   $('#btn-theme').addEventListener('click', (e) => {
     e.stopPropagation();
+    e.stopImmediatePropagation();
     toggleAppThemeMenu();
   });
 
   $('#btn-login-theme').addEventListener('click', (e) => {
     e.stopPropagation();
+    e.stopImmediatePropagation();
     toggleLoginThemeMenu();
   });
 
@@ -1079,12 +1092,19 @@
     closeAppThemeMenu();
   });
 
-  document.addEventListener('click', () => {
-    closeAllThemeMenus();
+  document.addEventListener('click', (e) => {
+    const loginWrap = document.querySelector('#login-theme-chips.login-theme-dd');
+    if (!loginWrap || !loginWrap.contains(e.target)) closeLoginThemeMenu();
+    const appDd = $('#app-theme-dd');
+    if (!appDd || !appDd.contains(e.target)) closeAppThemeMenu();
+    const rWrap = $('#refresh-split-wrap');
+    if (!rWrap || !rWrap.contains(e.target)) closeRefreshPopover();
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeAllThemeMenus();
+    if (e.key !== 'Escape') return;
+    closeAllThemeMenus();
+    closeRefreshPopover();
   });
 
   $('#btn-menu').addEventListener('click', () => {
@@ -1199,30 +1219,25 @@
   (function initRefreshPopover() {
     const menu = $('#btn-refresh-menu');
     const pop = $('#refresh-popover');
-    const wrap = $('#refresh-split-wrap');
-    if (!menu || !pop || !wrap) return;
-    menu.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const nowHidden = pop.classList.toggle('hidden');
-      menu.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
-    });
-    pop.addEventListener('click', (e) => e.stopPropagation());
-    /* После обработчика кнопки: иначе в части браузеров document закрывает попап в том же тике */
-    document.addEventListener('click', (e) => {
-      if (wrap.contains(e.target)) return;
-      window.setTimeout(() => {
-        if (!pop.classList.contains('hidden')) {
+    if (!menu || !pop) return;
+    menu.addEventListener(
+      'click',
+      (e) => {
+        e.stopImmediatePropagation();
+        e.stopPropagation();
+        closeAllThemeMenus();
+        const open = pop.classList.contains('hidden');
+        if (open) {
+          pop.classList.remove('hidden');
+          menu.setAttribute('aria-expanded', 'true');
+        } else {
           pop.classList.add('hidden');
           menu.setAttribute('aria-expanded', 'false');
         }
-      }, 0);
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape' || pop.classList.contains('hidden')) return;
-      pop.classList.add('hidden');
-      menu.setAttribute('aria-expanded', 'false');
-    });
+      },
+      false,
+    );
+    pop.addEventListener('click', (e) => e.stopPropagation());
   })();
 
   (async function initSession() {
