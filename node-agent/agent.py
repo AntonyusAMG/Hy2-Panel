@@ -1,5 +1,8 @@
 """
 HY2 Node Agent — FastAPI. Конфиг: /opt/hy2-agent/config.json (путь можно переопределить переменной HY2_AGENT_CONFIG).
+
+Накопительный трафик (ответ GET /traffic для панели и HAPP): по умолчанию пишется в data/traffic_counters.json
+рядом с agent.py (или в traffic_persist_path). Переживает перезапуск Hysteria и сервера. Отключить: "traffic_persist": false.
 """
 from __future__ import annotations
 
@@ -8,6 +11,7 @@ import hashlib
 import json
 import os
 import re
+from html import escape as html_escape
 from urllib.parse import quote, urlparse
 import subprocess
 import time
@@ -19,15 +23,20 @@ import httpx
 import psutil
 import yaml
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
 
 CONFIG_PATH = Path(os.environ.get("HY2_AGENT_CONFIG", "/opt/hy2-agent/config.json"))
+# Публичная заглушка: кнопка Telegram, если в config не задан landing_telegram_bot
+LANDING_TELEGRAM_DEFAULT = "https://t.me/privatevpnest_bot"
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 app = FastAPI(title="HY2 Node Agent", docs_url=None, redoc_url=None, openapi_url=None)
+_traffic_merge_lock = asyncio.Lock()
+_login_lock = asyncio.Lock()
+_login_rate_limit: dict[str, list[float]] = {}
 
 _config: dict[str, Any] = {}
 _ui_path: Path = Path(__file__).resolve().parent / "ui" / "index.html"
@@ -39,6 +48,12 @@ def load_config() -> None:
         raise RuntimeError(f"Config not found: {CONFIG_PATH}")
     with open(CONFIG_PATH, encoding="utf-8") as f:
         _config = json.load(f)
+
+    # Валидация безопасности секретов
+    for k in ("token", "jwt_secret"):
+        if len(str(_config.get(k, ""))) < 32:
+            print(f"SECURITY WARNING: '{k}' is too short/weak in config! Please use at least 32 chars.")
+
     base = Path(__file__).resolve().parent
     _ui_path = base / "ui" / "index.html"
 
@@ -72,7 +87,8 @@ async def verify_bearer(authorization: str | None = Header(None)) -> dict[str, A
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=403, detail="Missing or invalid Authorization header")
     raw = authorization[7:].strip()
-    if raw == _agent_token():
+    token = _agent_token()
+    if token and len(token) >= 32 and raw == token:
         return {"kind": "agent"}
     try:
         payload = jwt.decode(raw, _jwt_secret(), algorithms=["HS256"])
@@ -85,9 +101,10 @@ async def verify_sub_key_or_jwt(
     k: str | None = Query(None, description="happ_subscription_key из config.json"),
     authorization: str | None = Header(None),
 ) -> dict[str, Any]:
-    """Подписка HAPP: доступ по ?k=общий_ключ или Bearer JWT."""
-    sk = str(_config.get("happ_subscription_key") or "").strip()
-    if sk and (k or "").strip() == sk:
+    """Подписка HAPP: доступ по ?k= (тот же ключ, что в ссылке из панели) или Bearer JWT."""
+    kq = (k or "").strip()
+    expected = _happ_subscription_key()
+    if expected and kq == expected:
         return {"kind": "subkey"}
     return await verify_bearer(authorization)
 
@@ -181,12 +198,229 @@ async def _stats_request(method: str, url_path: str, content: bytes | None = Non
         return {"raw": r.text}
 
 
+# --- Накопительный трафик на диске (переживает перезапуск HY2 / сервера) ---
+
+
+def _traffic_persist_enabled() -> bool:
+    return _config.get("traffic_persist", True) is not False
+
+
+def _traffic_persist_path() -> Path:
+    p = _config.get("traffic_persist_path")
+    if p:
+        return Path(str(p)).expanduser()
+    return Path(__file__).resolve().parent / "data" / "traffic_counters.json"
+
+
+def _read_traffic_state() -> dict[str, Any]:
+    path = _traffic_persist_path()
+    if not path.is_file():
+        return {"version": 1, "users": {}}
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        if not isinstance(d, dict):
+            return {"version": 1, "users": {}}
+        u = d.get("users")
+        if not isinstance(u, dict):
+            d["users"] = {}
+        d.setdefault("version", 1)
+        return d
+    except Exception:
+        return {"version": 1, "users": {}}
+
+
+def _write_traffic_state(d: dict[str, Any]) -> None:
+    path = _traffic_persist_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(d, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+
+
+def _pairs_from_traffic_val(v: Any) -> tuple[int, int]:
+    if not isinstance(v, dict):
+        return 0, 0
+    up = v.get("tx") if v.get("tx") is not None else v.get("upload")
+    down = v.get("rx") if v.get("rx") is not None else v.get("download")
+    try:
+        return max(0, int(up or 0)), max(0, int(down or 0))
+    except (TypeError, ValueError):
+        return 0, 0
+
+
+def _extract_traffic_users(raw: Any) -> tuple[dict[str, dict[str, Any]] | None, str]:
+    """Выделяет карту user_id → объект счётчиков из ответа HY2. Режим: users_key | flat | none."""
+    if not isinstance(raw, dict):
+        return None, "none"
+    if "users" in raw and isinstance(raw["users"], dict) and not isinstance(raw["users"], list):
+        return raw["users"], "users_key"
+    skip = frozenset({"online", "data", "users", "meta", "server", "system", "version"})
+    out: dict[str, dict[str, Any]] = {}
+    for k, v in raw.items():
+        if k in skip:
+            continue
+        if isinstance(v, dict):
+            up, down = _pairs_from_traffic_val(v)
+            if up or down or any(x in v for x in ("tx", "rx", "upload", "download")):
+                out[str(k)] = v
+    if out:
+        return out, "flat"
+    return None, "none"
+
+
+def _merge_traffic_persist_sync(raw: Any) -> Any:
+    """
+    Для каждого пользователя: total = base + текущий HY2.
+    Если tx/rx от HY2 уменьшились (рестарт) — прошлая «сессия» добавляется в base.
+    """
+    if not _traffic_persist_enabled():
+        return raw
+    state = _read_traffic_state()
+    users_state: dict[str, Any] = state.setdefault("users", {})
+    extracted, mode = _extract_traffic_users(raw)
+    if extracted is None or mode == "none":
+        return raw
+
+    merged_users: dict[str, dict[str, Any]] = {}
+    all_ids = set(extracted.keys()) | set(users_state.keys())
+
+    for uid in sorted(all_ids):
+        st = users_state.get(uid)
+        if not isinstance(st, dict):
+            st = {}
+        base_up = int(st.get("base_up") or 0)
+        base_down = int(st.get("base_down") or 0)
+        last_up = int(st.get("last_up") or 0)
+        last_down = int(st.get("last_down") or 0)
+
+        if uid in extracted:
+            cur_up, cur_down = _pairs_from_traffic_val(extracted[uid])
+            if cur_up < last_up:
+                base_up += last_up
+            if cur_down < last_down:
+                base_down += last_down
+            last_up = cur_up
+            last_down = cur_down
+            total_up = base_up + cur_up
+            total_down = base_down + cur_down
+        else:
+            total_up = base_up
+            total_down = base_down
+
+        users_state[uid] = {
+            "base_up": base_up,
+            "base_down": base_down,
+            "last_up": last_up,
+            "last_down": last_down,
+        }
+
+        orig = extracted.get(uid) if uid in extracted else None
+        if isinstance(orig, dict):
+            merged_val = dict(orig)
+            if "tx" in merged_val or "rx" in merged_val:
+                merged_val["tx"] = total_up
+                merged_val["rx"] = total_down
+            if "upload" in merged_val or "download" in merged_val:
+                merged_val["upload"] = total_up
+                merged_val["download"] = total_down
+            if "tx" not in merged_val and "rx" not in merged_val and "upload" not in merged_val and "download" not in merged_val:
+                merged_val["tx"] = total_up
+                merged_val["rx"] = total_down
+        else:
+            merged_val = {"tx": total_up, "rx": total_down}
+        merged_users[uid] = merged_val
+
+    _write_traffic_state(state)
+
+    if mode == "users_key":
+        out = {k: v for k, v in raw.items() if k != "users"}
+        out["users"] = merged_users
+        return out
+    out = dict(raw)
+    for uid, mv in merged_users.items():
+        out[uid] = mv
+    return out
+
+
+async def _traffic_with_persistence() -> Any:
+    if not _traffic_persist_enabled():
+        return await _stats_request("GET", "/traffic")
+    async with _traffic_merge_lock:
+        raw = await _stats_request("GET", "/traffic")
+        return await asyncio.to_thread(_merge_traffic_persist_sync, raw)
+
+
+def _traffic_persist_remove_user(tid: str) -> None:
+    state = _read_traffic_state()
+    u = state.get("users")
+    if isinstance(u, dict) and tid in u:
+        del u[tid]
+        _write_traffic_state(state)
+
+
+def _traffic_persist_clear_user(tid: str) -> None:
+    """Сброс накопленного для пользователя (после reset в HY2)."""
+    state = _read_traffic_state()
+    u = state.setdefault("users", {})
+    u[tid] = {"base_up": 0, "base_down": 0, "last_up": 0, "last_down": 0}
+    _write_traffic_state(state)
+
+
 def _systemctl_is_active(unit: str) -> str:
     return subprocess.run(
         ["systemctl", "is-active", unit],
         capture_output=True,
         text=True,
     ).stdout.strip()
+
+
+_net_io_last: tuple[float, int, int] | None = None
+
+
+def _net_io_snapshot() -> dict[str, Any]:
+    """Суммарный трафик интерфейсов и мгновенная скорость (по дельте между запросами /status)."""
+    global _net_io_last
+    now = time.time()
+    try:
+        c = psutil.net_io_counters()
+    except Exception:
+        return {}
+    sent = int(c.bytes_sent)
+    recv = int(c.bytes_recv)
+    out: dict[str, Any] = {
+        "bytes_sent_total": sent,
+        "bytes_recv_total": recv,
+        "net_speed_up_bps": 0.0,
+        "net_speed_down_bps": 0.0,
+    }
+    if _net_io_last is not None:
+        t0, s0, r0 = _net_io_last
+        dt = now - t0
+        if dt > 0.05:
+            out["net_speed_up_bps"] = max(0.0, (sent - s0) / dt)
+            out["net_speed_down_bps"] = max(0.0, (recv - r0) / dt)
+    _net_io_last = (now, sent, recv)
+    return out
+
+
+_HY_VER_RE = re.compile(
+    r"v?\d+\.\d+(?:\.\d+)?(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?",
+)
+
+
+def _line_is_hysteria_banner(s: str) -> bool:
+    """Новые сборки hysteria печатают ASCII/Unicode-арт в начале вывода version."""
+    n = len(s)
+    if n < 10:
+        return False
+    blocky = 0
+    for c in s:
+        o = ord(c)
+        if 0x2580 <= o <= 0x259F or c in "█░▒▓▄▀":
+            blocky += 1
+    return blocky >= max(8, n // 4)
 
 
 def _hysteria_version_line() -> str:
@@ -197,8 +431,34 @@ def _hysteria_version_line() -> str:
             text=True,
             timeout=5,
         )
-        line = (p.stdout or p.stderr or "").strip().splitlines()
-        return line[0].strip() if line else "unknown"
+        text = (p.stdout or p.stderr or "").strip()
+        if not text:
+            return "unknown"
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        if not lines:
+            return "unknown"
+        for ln in lines:
+            m = re.search(r"(?i)version\s*:\s*(.+)", ln)
+            if m:
+                tail = m.group(1).strip()
+                vm = _HY_VER_RE.search(tail)
+                return (vm.group(0) if vm else tail)[:120]
+        for ln in lines:
+            if _line_is_hysteria_banner(ln):
+                continue
+            vm = _HY_VER_RE.search(ln)
+            if vm:
+                return vm.group(0)[:120]
+            if len(ln) < 64:
+                return ln[:120]
+        for ln in lines:
+            vm = _HY_VER_RE.search(ln)
+            if vm:
+                return vm.group(0)[:120]
+        for ln in lines:
+            if not _line_is_hysteria_banner(ln):
+                return ln[:120]
+        return "unknown"
     except Exception:
         return "unknown"
 
@@ -211,19 +471,38 @@ async def status(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
     uptime_s = int(time.time() - boot)
     vm = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
+    sw = psutil.swap_memory()
+    load_avg: list[float] = []
+    try:
+        load_avg = [round(float(x), 2) for x in os.getloadavg()]
+    except OSError:
+        pass
     pb = str(_config.get("public_base_url") or "").strip().rstrip("/")
-    return {
+    resolved_domain = ""
+    try:
+        resolved_domain = _hysteria_public_domain(_read_hysteria_yaml())
+    except Exception:
+        pass
+    payload: dict[str, Any] = {
         "node_name": str(_config.get("node_name", "")),
         "panel_public_url": pb,
+        "hysteria_client_domain": resolved_domain,
         "hysteria_service": _hysteria_service(),
         "hysteria_active": hysteria_active,
         "hysteria_version": _hysteria_version_line(),
         "hy2_agent_active": hy2_agent_active,
         "cpu_percent": psutil.cpu_percent(interval=None),
+        "cpu_count": psutil.cpu_count(logical=True) or 0,
+        "load_average": load_avg,
         "memory": {
             "total": vm.total,
             "used": vm.used,
             "percent": vm.percent,
+        },
+        "swap": {
+            "total": int(sw.total),
+            "used": int(sw.used),
+            "percent": float(sw.percent),
         },
         "disk": {
             "total": disk.total,
@@ -232,6 +511,8 @@ async def status(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
         },
         "uptime_seconds": uptime_s,
     }
+    payload.update(_net_io_snapshot())
+    return payload
 
 
 @app.get("/users")
@@ -246,6 +527,28 @@ async def list_users(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
     else:
         users = []
     return {"users": users}
+
+
+def _host_from_url(s: str) -> str:
+    """Домен из https://host/path или host:port."""
+    s = (s or "").strip()
+    if not s:
+        return ""
+    u = s if "://" in s else f"https://{s}"
+    h = urlparse(u).hostname
+    return (h or "").strip()
+
+
+def _domain_from_le_cert_path(y: dict[str, Any]) -> str:
+    """Домен из пути cert Let's Encrypt: .../live/example.com/fullchain.pem."""
+    tls = y.get("tls")
+    if not isinstance(tls, dict):
+        return ""
+    cert = str(tls.get("cert") or "").strip().replace("\\", "/")
+    if not cert:
+        return ""
+    m = re.search(r"/live/([^/]+)/", cert)
+    return m.group(1).strip() if m else ""
 
 
 def _hysteria_listen_port(y: dict[str, Any]) -> int:
@@ -265,23 +568,34 @@ def _hysteria_listen_port(y: dict[str, Any]) -> int:
 
 
 def _hysteria_public_domain(y: dict[str, Any]) -> str:
-    """Домен для hysteria2:// (SNI): acme.domains[0], либо tls + public_base_url агента, либо public_domain в YAML."""
+    """Домен для hysteria2:// (SNI). Сначала config агента и LE-путь cert — не masquerade (там часто чужой URL)."""
+    agent_dom = str(_config.get("hysteria_public_domain") or "").strip()
+    if agent_dom:
+        return agent_dom
+    pb = str(_config.get("public_base_url") or "").strip().rstrip("/")
+    if pb:
+        host = _host_from_url(pb)
+        if host:
+            return host
     acme = y.get("acme") or {}
     doms = acme.get("domains")
     if isinstance(doms, list) and doms:
         d = str(doms[0]).strip()
         if d:
             return d
-    for key in ("public_domain", "server_name"):
+    for key in ("public_domain", "server_name", "sni"):
         v = (y.get(key) or "").strip()
         if v:
             return v
-    pb = str(_config.get("public_base_url") or "").strip().rstrip("/")
-    if pb:
-        u = pb if "://" in pb else f"https://{pb}"
-        host = urlparse(u).hostname
-        if host:
-            return host
+    tls = y.get("tls")
+    if isinstance(tls, dict):
+        for key in ("sni", "server_name", "domain"):
+            v = (tls.get(key) or "").strip()
+            if v:
+                return v
+    d = _domain_from_le_cert_path(y)
+    if d:
+        return d
     return ""
 
 
@@ -325,18 +639,16 @@ def _happ_country_flag_name(hc: dict[str, Any]) -> tuple[str, str]:
 
 
 def _happ_fragment_for_client(tid: str, node_name: str, hc: dict[str, Any]) -> str:
-    """Текст после # в hysteria2:// — так HAPP показывает строку в списке серверов."""
+    """Текст после # в hysteria2:// — строка сервера: «🇳🇱 Страна - ID» (как карточка в HAPP), без бренда в названии."""
     flag, cname = _happ_country_flag_name(hc)
     region = (hc.get("region_label") or hc.get("country") or "").strip()
     if flag and cname:
-        core = f"{flag} {cname} · {node_name}"
-    elif cname:
-        core = f"{cname} · {node_name}"
-    elif region:
-        core = f"{region} · {node_name}"
-    else:
-        core = node_name
-    return f"{core} | ID {tid}"
+        return f"{flag} {cname} - {tid}"
+    if cname:
+        return f"{cname} - {tid}"
+    if region:
+        return f"{region} - {tid}"
+    return f"{node_name} - {tid}"
 
 
 def _happ_subscription_key() -> str:
@@ -360,6 +672,141 @@ def _public_base_url(request: Request) -> str:
     if xf and xhost:
         return f"{xf}://{xhost}"
     return str(request.base_url).rstrip("/")
+
+
+def _landing_urls(request: Request) -> tuple[str, str, str]:
+    """(резерв: ссылка /ui для служебных целей, сайт, Telegram)."""
+    panel = _public_base_url(request).rstrip("/") + "/ui"
+    home = str(_config.get("landing_home_url") or "https://xtinder.ru").strip() or "https://xtinder.ru"
+    tg = str(_config.get("landing_telegram_bot") or "").strip() or LANDING_TELEGRAM_DEFAULT
+    return panel, home, tg
+
+
+def _landing_html(request: Request, *, not_found: bool) -> str:
+    """Публичная страница: сайт и Telegram (без ссылки на панель)."""
+    _panel, home, tg = _landing_urls(request)
+    node = html_escape(str(_config.get("node_name") or "HY2 Node"))
+    hint = ""
+    if not_found:
+        hint = (
+            '<p class="hint warn">Страница по этому адресу не найдена. '
+            "Проверьте URL или настройки прокси. Панель ноды доступна только по служебному адресу для администраторов.</p>"
+        )
+    return f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{node} — доступ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {{
+      --bg: #0e1621;
+      --card: #17212b;
+      --border: rgba(255,255,255,0.08);
+      --txt: #e4edf5;
+      --muted: #8f9aad;
+      --accent: #5288c1;
+      --accent2: #6ab3f3;
+      --green: #5dc992;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      min-height: 100dvh;
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 20% -10%, rgba(82,136,193,0.18), transparent 55%),
+        radial-gradient(900px 500px at 100% 30%, rgba(93,201,146,0.08), transparent 50%),
+        var(--bg);
+      color: var(--txt);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }}
+    .card {{
+      width: 100%;
+      max-width: 420px;
+      background: linear-gradient(165deg, color-mix(in srgb, var(--card) 100%, transparent), #1a2430);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px 26px 26px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    }}
+    .logo {{
+      font-weight: 800;
+      font-size: 1.35rem;
+      letter-spacing: -0.03em;
+      margin: 0 0 6px;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }}
+    .sub {{
+      margin: 0 0 20px;
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }}
+    .hint {{
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.5;
+      margin: 0 0 18px;
+    }}
+    .hint.warn {{ color: #e9a84c; }}
+    .hint code {{ font-size: 0.78em; padding: 2px 6px; border-radius: 6px; background: rgba(0,0,0,0.25); }}
+    .actions {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }}
+    .btn {{
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.92rem;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s;
+    }}
+    .btn:hover {{ transform: translateY(-1px); }}
+    .btn-secondary {{
+      background: rgba(255,255,255,0.04);
+      color: var(--txt);
+    }}
+    .btn-tg {{
+      background: linear-gradient(135deg, #2aabee, #229ed9);
+      color: #fff;
+      border-color: transparent;
+    }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 class="logo">{node}</h1>
+    <p class="sub">Частный VPN · узел на Hysteria 2</p>
+    {hint}
+    <div class="actions">
+      <a class="btn btn-tg" href="{html_escape(tg, quote=True)}" target="_blank" rel="noopener">Telegram — бот</a>
+      <a class="btn btn-secondary" href="{html_escape(home, quote=True)}" target="_blank" rel="noopener">Сайт xtinder.ru</a>
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+def _serve_ui_file() -> FileResponse:
+    if not _ui_path.is_file():
+        raise HTTPException(status_code=404, detail="ui/index.html not found")
+    return FileResponse(_ui_path, media_type="text/html; charset=utf-8")
 
 
 def _trunc_happ_title(s: str, max_len: int = 25) -> str:
@@ -392,7 +839,7 @@ def _subscription_total_bytes() -> int:
 
 async def _user_traffic_up_down(tid: str) -> tuple[int, int]:
     try:
-        data = await _stats_request("GET", "/traffic")
+        data = await _traffic_with_persistence()
     except HTTPException:
         return 0, 0
     if not isinstance(data, dict):
@@ -423,8 +870,10 @@ def _build_hysteria2_uri_dict(tid: str) -> dict[str, Any]:
         raise HTTPException(
             status_code=503,
             detail=(
-                "Не задан домен для ссылки: укажите acme.domains в config.yaml Hysteria, "
-                "или public_domain в YAML, или public_base_url (https://домен) в config.json агента."
+                "Не задан домен для ссылки (SNI). Укажите в config.json агента public_base_url "
+                "(https://тот-же-домен-что-у-панели-Apache) или hysteria_public_domain; "
+                "либо в config.yaml Hysteria: acme.domains, public_domain / server_name, tls.sni, "
+                "или путь tls.cert вида .../letsencrypt/live/ДОМЕН/fullchain.pem."
             ),
         )
     port = _hysteria_listen_port(y)
@@ -547,13 +996,15 @@ async def delete_user(telegram_id: str, _: dict = Depends(verify_bearer)) -> dic
         raise HTTPException(status_code=404, detail="User not found")
     del up[tid]
     _write_hysteria_yaml(y)
+    if _traffic_persist_enabled():
+        await asyncio.to_thread(_traffic_persist_remove_user, tid)
     await asyncio.to_thread(_restart_hysteria)
     return {"ok": True}
 
 
 @app.get("/traffic")
 async def traffic_all(_: dict = Depends(verify_bearer)) -> Any:
-    return await _stats_request("GET", "/traffic")
+    return await _traffic_with_persistence()
 
 
 @app.get("/online")
@@ -565,7 +1016,7 @@ async def online_stats(_: dict = Depends(verify_bearer)) -> Any:
 @app.get("/traffic/{telegram_id}")
 async def traffic_one(telegram_id: str, _: dict = Depends(verify_bearer)) -> Any:
     tid = _validate_tg_id(telegram_id)
-    data = await _stats_request("GET", "/traffic")
+    data = await _traffic_with_persistence()
     # Ответ HY2 может быть dict/list — пытаемся отфильтровать по ключу пользователя
     if isinstance(data, dict) and tid in data:
         return {tid: data[tid]}
@@ -588,6 +1039,8 @@ async def traffic_reset(telegram_id: str, _: dict = Depends(verify_bearer)) -> d
                     headers=_stats_authorization_headers(),
                 )
             if r.status_code < 400:
+                if _traffic_persist_enabled():
+                    await asyncio.to_thread(_traffic_persist_clear_user, tid)
                 return {"ok": True, "path": path, "response": r.text[:500]}
         except Exception:
             continue
@@ -656,12 +1109,33 @@ async def logs(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
 
 
 @app.post("/auth/login")
-async def login(body: LoginBody) -> dict[str, Any]:
+async def login(body: LoginBody, request: Request) -> dict[str, Any]:
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    async with _login_lock:
+        if ip not in _login_rate_limit:
+            _login_rate_limit[ip] = []
+        # Ограничение: 5 попыток за 15 минут (900 сек)
+        _login_rate_limit[ip] = [t for t in _login_rate_limit[ip] if now - t < 900]
+        if len(_login_rate_limit[ip]) >= 5:
+            raise HTTPException(status_code=429, detail="Too many failed login attempts. Please wait 15 minutes.")
+
     if body.login != _config.get("login"):
+        async with _login_lock:
+            _login_rate_limit[ip].append(now)
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
     ph = str(_config.get("password_hash", ""))
     if not pwd_ctx.verify(body.password, ph):
+        async with _login_lock:
+            _login_rate_limit[ip].append(now)
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Сброс счетчика при успешном входе
+    async with _login_lock:
+        if ip in _login_rate_limit:
+            del _login_rate_limit[ip]
+
     exp = datetime.now(timezone.utc) + timedelta(hours=24)
     token = jwt.encode(
         {"sub": body.login, "exp": exp},
@@ -671,14 +1145,38 @@ async def login(body: LoginBody) -> dict[str, Any]:
     return {"access_token": token, "token_type": "bearer", "expires_in": 86400}
 
 
+@app.get("/")
+async def root_landing(request: Request) -> HTMLResponse:
+    """Красивая точка входа: панель, сайт, Telegram (без JSON)."""
+    return HTMLResponse(_landing_html(request, not_found=False), status_code=200)
+
+
 @app.get("/ui")
-async def ui() -> FileResponse:
-    if not _ui_path.is_file():
-        raise HTTPException(status_code=404, detail="ui/index.html not found")
-    return FileResponse(_ui_path, media_type="text/html; charset=utf-8")
+@app.get("/ui/", include_in_schema=False)
+async def ui_entry() -> FileResponse:
+    return _serve_ui_file()
 
 
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/{catch_all:path}", include_in_schema=False)
+async def catch_all_get(catch_all: str, request: Request) -> Response:
+    """Любой неизвестный GET: браузеру — HTML-заглушка, API — JSON 404."""
+    accept = (request.headers.get("accept") or "").lower()
+    if "text/html" in accept:
+        return HTMLResponse(_landing_html(request, not_found=True), status_code=404)
+    raise HTTPException(status_code=404, detail="Not Found")
+
+
+@app.exception_handler(HTTPException)
+async def hy2_http_exception_handler(request: Request, exc: HTTPException) -> Response:
+    """Браузеру при 404 — HTML-заглушка вместо JSON {detail: Not Found}."""
+    if exc.status_code == 404:
+        accept = (request.headers.get("accept") or "").lower()
+        if "text/html" in accept:
+            return HTMLResponse(_landing_html(request, not_found=True), status_code=404)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 

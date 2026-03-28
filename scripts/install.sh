@@ -67,6 +67,15 @@ usage() {
 Переменные окружения (опционально):
   ACME_EMAIL  — email для Let's Encrypt (если не задан — спросит интерактивно)
 
+  HAPP (подписка HAPP / заголовок профиля) — не приходят с мастера; мастер при регистрации
+  не отдаёт страну. Задайте до установки или отредактируйте /opt/hy2-agent/config.json позже:
+    HY2_CFG_HAPP_PROFILE_TITLE   — например "⚡ XTinder VPN" (#profile-title в подписке)
+    HY2_CFG_COUNTRY_CODE         — ISO, например NL (флаг/название подтянутся из пресетов агента)
+    HY2_CFG_COUNTRY_FLAG         — переопределение флага, например 🇳🇱
+    HY2_CFG_COUNTRY_NAME         — переопределение названия страны
+    HY2_CFG_SUPPORT_URL          — Telegram: https://t.me/...
+    HY2_CFG_PROFILE_WEB_URL      — страница «инфо»: https://...
+
 Панель по HTTPS: Apache (TCP 443) → reverse-proxy на агент; сертификат Let's Encrypt через certbot (автопродление).
 Hysteria 2 (QUIC) слушает UDP 443 с теми же сертификатами из файлов (TCP 443 не занимает).
 
@@ -226,6 +235,14 @@ export HY2_CFG_DOMAIN="$DOMAIN"
 HAPP_SUB_KEY="$(openssl rand -hex 24)"
 export HY2_CFG_HAPP_SUB_KEY="$HAPP_SUB_KEY"
 
+# HAPP: мастер страну не присылает — только опциональные env (см. usage).
+export HY2_CFG_HAPP_PROFILE_TITLE="${HY2_CFG_HAPP_PROFILE_TITLE:-}"
+export HY2_CFG_COUNTRY_CODE="${HY2_CFG_COUNTRY_CODE:-}"
+export HY2_CFG_COUNTRY_FLAG="${HY2_CFG_COUNTRY_FLAG:-}"
+export HY2_CFG_COUNTRY_NAME="${HY2_CFG_COUNTRY_NAME:-}"
+export HY2_CFG_SUPPORT_URL="${HY2_CFG_SUPPORT_URL:-}"
+export HY2_CFG_PROFILE_WEB_URL="${HY2_CFG_PROFILE_WEB_URL:-}"
+
 info "Запись /opt/hy2-agent/config.json..."
 /opt/hy2-agent/venv/bin/python3 <<'PY'
 import json, os
@@ -246,13 +263,13 @@ cfg = {
     "happ_subscription_key": os.environ.get("HY2_CFG_HAPP_SUB_KEY", ""),
     "public_base_url": public_base_url,
     "happ": {
-        "profile_title": "",
-        "country_code": "",
-        "country_flag": "",
-        "country_name": "",
+        "profile_title": (os.environ.get("HY2_CFG_HAPP_PROFILE_TITLE") or "").strip(),
+        "country_code": (os.environ.get("HY2_CFG_COUNTRY_CODE") or "").strip(),
+        "country_flag": (os.environ.get("HY2_CFG_COUNTRY_FLAG") or "").strip(),
+        "country_name": (os.environ.get("HY2_CFG_COUNTRY_NAME") or "").strip(),
         "region_label": "",
-        "support_url": "",
-        "profile_web_page_url": "",
+        "support_url": (os.environ.get("HY2_CFG_SUPPORT_URL") or "").strip(),
+        "profile_web_page_url": (os.environ.get("HY2_CFG_PROFILE_WEB_URL") or "").strip(),
         "subscription_total_bytes": 0,
         "default_expire_unix": 0,
     },
@@ -263,6 +280,7 @@ with open("/opt/hy2-agent/config.json", "w", encoding="utf-8") as f:
 PY
 
 unset HY2_CFG_NODE_NAME HY2_CFG_MASTER_URL HY2_CFG_TOKEN HY2_CFG_AGENT_PORT HY2_CFG_STATS_SECRET HY2_CFG_LOGIN HY2_CFG_PASSWORD_HASH HY2_CFG_JWT_SECRET HY2_CFG_HAPP_SUB_KEY HY2_CFG_DOMAIN
+unset HY2_CFG_HAPP_PROFILE_TITLE HY2_CFG_COUNTRY_CODE HY2_CFG_COUNTRY_FLAG HY2_CFG_COUNTRY_NAME HY2_CFG_SUPPORT_URL HY2_CFG_PROFILE_WEB_URL
 
 info "Установка systemd: hy2-agent.service..."
 cp -f "$NODE_AGENT_SRC/hy2-agent.service" /etc/systemd/system/hy2-agent.service

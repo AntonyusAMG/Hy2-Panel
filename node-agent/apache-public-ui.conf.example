@@ -1,0 +1,18 @@
+# Пример: весь хост nl2.example.com → агент HY2 (как в scripts/install.sh).
+# Тогда открываются и https://домен/ (заглушка со ссылками), и https://домен/ui (панель).
+#
+#   ProxyPass        / http://127.0.0.1:AGENT_PORT/
+#   ProxyPassReverse / http://127.0.0.1:AGENT_PORT/
+#
+# Если при открытии /ui видите JSON {"detail":"Not Found"}:
+# 1) Запрос не доходит до hy2-agent (другой бэкенд / другой vhost).
+# 2) Путь обрезан: например прокси только /api, а /ui не проксируется.
+# 3) Убедитесь, что в config.json задано public_base_url: "https://тот-же-хост"
+#    и перезапустите: systemctl restart hy2-agent
+#
+# Отдельный статический «лендинг» в Apache (без прокси на агент для /):
+#   Alias /ui-landing /var/www/hy2-landing
+#   <Directory /var/www/hy2-landing>
+#       Require all granted
+#   </Directory>
+# Обычно достаточно встроенной HTML-страницы агента на GET / и обработчика 404.

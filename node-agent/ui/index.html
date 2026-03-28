@@ -88,7 +88,7 @@
     }
 
     * { box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; }
+    html, body { margin: 0; min-height: 100%; height: 100%; }
     body {
       font-family: var(--font);
       background: var(--bg0);
@@ -374,39 +374,145 @@
       text-align: center;
     }
 
-    /* ——— App ——— */
+    /* ——— Переходы: вход → приложение ——— */
+    @keyframes loginCardReveal {
+      from { opacity: 0; transform: translateY(16px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes appShellReveal {
+      from { opacity: 0; transform: translateY(12px); filter: blur(6px); }
+      to { opacity: 1; transform: translateY(0); filter: none; }
+    }
+    .login-card {
+      animation: loginCardReveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+    }
+    .login-theme-bar {
+      animation: loginCardReveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    #view-app.app-reveal {
+      animation: appShellReveal 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .login-card, .login-theme-bar, #view-app.app-reveal { animation: none !important; }
+    }
+
+    /* ——— App: шапка и сайдбар фиксированы по высоте окна, скролл только в main ——— */
     #view-app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      max-height: 100dvh;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .app-shell {
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
       display: grid;
       grid-template-columns: var(--sidebar-w) 1fr;
-      grid-template-rows: auto 1fr;
-      min-height: 100vh;
+      grid-template-rows: minmax(0, 1fr);
+      overflow: hidden;
+    }
+    .sidebar-overlay {
+      display: none;
+    }
+    .sidebar-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      height: 100%;
+      min-height: 0;
     }
     @media (max-width: 900px) {
-      #view-app { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
-      .sidebar.open {
-        display: flex;
+      .app-shell {
+        grid-template-columns: 1fr;
+        position: relative;
+      }
+      .sidebar-overlay:not(.hidden) {
+        display: block;
         position: fixed;
         inset: 0;
-        z-index: 100;
-        background: color-mix(in srgb, var(--bg0) 96%, transparent);
-        backdrop-filter: blur(8px);
-        flex-direction: column;
-        padding: 20px;
-        border-right: 0;
+        z-index: 99;
+        background: color-mix(in srgb, #000 52%, transparent);
+        backdrop-filter: blur(4px);
+        animation: overlayIn 0.28s ease;
       }
+      @keyframes overlayIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .sidebar {
+        display: flex;
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: none;
+        z-index: 100;
+        padding: 0;
+        border-right: none;
+        background: transparent;
+        backdrop-filter: none;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 0.28s ease, visibility 0.28s;
+      }
+      .sidebar.open {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+      }
+      .sidebar-inner {
+        width: min(292px, 88vw);
+        height: 100%;
+        padding: 22px 16px 24px;
+        background: color-mix(in srgb, var(--bg1) 94%, transparent);
+        border-right: 1px solid var(--border);
+        box-shadow: 12px 0 48px var(--shadow);
+        backdrop-filter: blur(20px) saturate(160%);
+        transform: translateX(-105%);
+        transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .sidebar.open .sidebar-inner {
+        transform: translateX(0);
+      }
+      .sidebar {
+        grid-column: 1;
+        grid-row: 1;
+      }
+      main {
+        grid-column: 1;
+        grid-row: 1;
+      }
+    }
+    @media (min-width: 901px) {
+      .sidebar-inner {
+        padding: 18px 8px 20px;
+        flex: 1;
+        gap: 4px;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sidebar-inner { transition: none !important; }
+      .sidebar.open .sidebar-inner { transform: none !important; }
+      .sidebar-overlay:not(.hidden) { animation: none !important; }
     }
 
     .topbar {
-      grid-column: 1 / -1;
+      flex: 0 0 auto;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
       padding: 14px 22px;
-      background: color-mix(in srgb, var(--bg1) 85%, transparent);
-      backdrop-filter: blur(12px);
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--bg1) 92%, transparent) 0%, color-mix(in srgb, var(--bg1) 78%, transparent) 100%);
+      backdrop-filter: blur(14px) saturate(150%);
       border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--txt) 4%, transparent) inset;
     }
     .topbar h1 {
       font-family: Syne, sans-serif;
@@ -434,43 +540,199 @@
     :root[data-theme="accent-violet"] .badge-node {
       background: linear-gradient(135deg, rgba(167,139,250,0.2), rgba(167,139,250,0.06));
     }
-    .topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .auto-refresh-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      padding: 5px 12px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: color-mix(in srgb, var(--bg2) 75%, transparent);
-      font-size: 0.78rem;
+    .topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    @media (max-width: 720px) {
+      .topbar-actions { justify-content: center; }
     }
-    .auto-refresh-toolbar label {
+    /* Компактное «Обновления»: split + popover (как на референсе) */
+    .refresh-split-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+    .refresh-split {
+      display: inline-flex;
+      align-items: stretch;
+      height: 32px;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--txt) 4%, transparent) inset;
+    }
+    .refresh-split-left,
+    .refresh-split-right {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      justify-content: center;
+      border: 0;
       cursor: pointer;
-      user-select: none;
+      padding: 0;
+      margin: 0;
+      font: inherit;
+      transition: background 0.18s ease, color 0.18s ease, filter 0.18s ease;
+    }
+    .refresh-split-left {
+      width: 38px;
+      background: var(--bg1);
+      color: color-mix(in srgb, var(--txt) 78%, var(--muted));
+    }
+    .refresh-split-left:hover {
+      background: color-mix(in srgb, var(--accent) 8%, var(--bg1));
+      color: var(--txt);
+    }
+    .refresh-split-right {
+      width: 34px;
+      background: color-mix(in srgb, var(--green) 32%, var(--bg2));
+      color: #fff;
+      border-left: 1px solid color-mix(in srgb, var(--green) 55%, var(--border));
+    }
+    .refresh-split-right:hover {
+      filter: brightness(1.08);
+    }
+    .refresh-split-right[aria-expanded="true"] {
+      filter: brightness(0.95);
+    }
+    :root[data-theme="light"] .refresh-split-right {
+      background: color-mix(in srgb, var(--green) 38%, #e8f5f0);
+      color: color-mix(in srgb, var(--green) 85%, #0a3d32);
+      border-left-color: color-mix(in srgb, var(--green) 40%, var(--border));
+    }
+    :root[data-theme="light"] .refresh-split-right svg {
+      stroke: currentColor;
+    }
+    .refresh-split svg {
+      display: block;
+      flex-shrink: 0;
+    }
+    .refresh-popover {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      min-width: 232px;
+      z-index: 250;
+      animation: refreshPopIn 0.2s ease;
+    }
+    @keyframes refreshPopIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .refresh-popover { animation: none; }
+    }
+    .refresh-popover-arrow {
+      position: absolute;
+      top: -5px;
+      right: 16px;
+      width: 10px;
+      height: 10px;
+      background: var(--bg1);
+      border-left: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      transform: rotate(45deg);
+      z-index: 1;
+    }
+    .refresh-popover-inner {
+      position: relative;
+      z-index: 2;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 14px 12px;
+      box-shadow: 0 12px 40px var(--shadow), 0 2px 10px color-mix(in srgb, var(--shadow) 50%, transparent);
+    }
+    .refresh-popover-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .refresh-popover-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--txt);
+      letter-spacing: -0.02em;
+    }
+    .refresh-switch-label {
+      position: relative;
+      display: inline-flex;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .refresh-switch-input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .refresh-switch-ui {
+      width: 40px;
+      height: 22px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--muted) 35%, var(--bg2));
+      position: relative;
+      transition: background 0.2s ease;
+      box-shadow: inset 0 1px 3px color-mix(in srgb, #000 12%, transparent);
+    }
+    .refresh-switch-ui::after {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--bg1);
+      top: 2px;
+      left: 2px;
+      box-shadow: 0 1px 3px var(--shadow);
+      transition: transform 0.2s ease;
+    }
+    .refresh-switch-input:checked + .refresh-switch-ui {
+      background: color-mix(in srgb, var(--green) 55%, var(--bg2));
+    }
+    .refresh-switch-input:checked + .refresh-switch-ui::after {
+      transform: translateX(18px);
+    }
+    .refresh-switch-input:focus-visible + .refresh-switch-ui {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .refresh-popover-divider {
+      border: 0;
+      height: 1px;
+      margin: 12px 0;
+      background: var(--border);
+    }
+    .refresh-popover-field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .refresh-interval-label {
+      font-size: 0.78rem;
       font-weight: 600;
       color: var(--muted);
     }
-    .auto-refresh-toolbar select {
+    .refresh-interval-select {
+      width: 100%;
       border: 1px solid var(--border);
-      background: var(--bg1);
+      background: var(--bg2);
       color: var(--txt);
-      border-radius: 8px;
-      padding: 5px 10px;
-      font-size: 0.78rem;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 0.82rem;
       font-family: inherit;
+      font-weight: 600;
       cursor: pointer;
-      max-width: 100px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
     }
-    #hdr-last-refresh {
-      font-size: 0.72rem;
+    .refresh-popover-foot {
+      font-size: 0.68rem;
       color: var(--muted);
+      margin: 12px 0 0;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
       white-space: nowrap;
-      max-width: 200px;
       overflow: hidden;
       text-overflow: ellipsis;
     }
@@ -478,18 +740,93 @@
       color: var(--accent2);
     }
     .btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 10px 14px;
       border: 1px solid var(--border);
-      background: var(--bg2);
+      background: linear-gradient(165deg, color-mix(in srgb, var(--bg2) 100%, transparent), color-mix(in srgb, var(--bg1) 88%, transparent));
       color: var(--txt);
-      border-radius: var(--radius-sm);
-      padding: 8px 14px;
+      border-radius: 12px;
       cursor: pointer;
       font-size: 0.82rem;
       font-weight: 600;
       font-family: inherit;
-      transition: border-color 0.15s, background 0.15s;
+      transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.2s, background 0.2s, color 0.2s;
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--txt) 5%, transparent) inset;
     }
-    .btn-icon:hover { border-color: var(--accent); background: var(--bg1); }
+    .btn-icon:hover {
+      border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+      background: linear-gradient(165deg, color-mix(in srgb, var(--accent) 12%, var(--bg2)), var(--bg1));
+      color: var(--accent2);
+      transform: translateY(-2px);
+      box-shadow:
+        0 1px 0 color-mix(in srgb, var(--txt) 6%, transparent) inset,
+        0 10px 28px var(--shadow),
+        0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent);
+    }
+    .btn-icon:active {
+      transform: translateY(0);
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--txt) 4%, transparent) inset;
+    }
+    .btn-icon:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+    }
+    /* Тема в топбаре: компактный dropdown (как на логине) */
+    .topbar-theme-dd {
+      position: relative;
+      display: inline-flex;
+      flex-shrink: 0;
+    }
+    .topbar-theme-dd .login-theme-dd-trigger {
+      gap: 6px;
+      padding: 0 10px 0 8px;
+      min-height: 40px;
+      border-radius: 12px;
+      font-size: 0.82rem;
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--txt) 5%, transparent) inset;
+    }
+    .topbar-theme-dd .login-theme-dd-trigger:hover {
+      transform: translateY(-1px);
+    }
+    .topbar-theme-dd .login-theme-dd-ico {
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+    }
+    .topbar-theme-dd .login-theme-dd-ico svg {
+      width: 16px;
+      height: 16px;
+    }
+    .topbar-theme-dd .login-theme-dd-label {
+      display: none;
+      min-width: 4.2em;
+      text-align: left;
+      font-size: 0.8rem;
+    }
+    @media (min-width: 720px) {
+      .topbar-theme-dd .login-theme-dd-label {
+        display: block;
+      }
+    }
+    .topbar-theme-dd .login-theme-dd-chevron {
+      width: 14px;
+      height: 14px;
+    }
+    .topbar-theme-dd .login-theme-dd-menu {
+      left: auto;
+      right: 0;
+      transform: none;
+      top: calc(100% + 6px);
+      min-width: 196px;
+    }
+    .topbar-theme-dd .login-theme-dd-menu::before {
+      left: auto;
+      right: 14px;
+    }
     .status-pill {
       font-size: 0.72rem;
       font-weight: 700;
@@ -501,14 +838,16 @@
     .status-pill.bad { background: rgba(229, 101, 101, 0.14); color: var(--red); }
 
     .sidebar {
-      grid-row: 2;
-      padding: 18px 8px 20px;
+      grid-column: 1;
+      grid-row: 1;
+      padding: 0;
       border-right: 1px solid var(--border);
       background: color-mix(in srgb, var(--bg1) 75%, transparent);
       backdrop-filter: blur(24px) saturate(150%);
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      min-height: 0;
+      overflow: hidden;
     }
     .sidebar-brand {
       padding: 6px 12px 16px;
@@ -531,10 +870,13 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      transition: background 0.15s, color 0.15s;
+      transition: background 0.2s, color 0.2s, transform 0.2s ease;
     }
-    .nav-btn .ic { font-size: 1.1rem; opacity: 0.9; width: 1.4em; text-align: center; }
-    .nav-btn:hover { background: var(--bg2); color: var(--txt); }
+    .nav-btn:hover {
+      background: color-mix(in srgb, var(--accent) 8%, var(--bg2));
+      color: var(--txt);
+      transform: translateX(2px);
+    }
     .nav-btn.active {
       background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent);
       color: var(--accent2);
@@ -542,9 +884,27 @@
     }
 
     main {
+      grid-column: 2;
+      grid-row: 1;
       padding: 24px 26px 40px;
-      overflow: auto;
-      background: var(--bg0);
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      background:
+        radial-gradient(ellipse 120% 80% at 50% -20%, var(--glow), transparent 55%),
+        var(--bg0);
+      min-height: 0;
+    }
+    @keyframes sectionFade {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    main section:not(.hidden) {
+      animation: sectionFade 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      main section:not(.hidden) { animation: none !important; }
     }
     .section-title {
       font-family: Syne, sans-serif;
@@ -552,6 +912,20 @@
       font-size: 1.35rem;
       margin: 0 0 20px;
       letter-spacing: -0.02em;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .section-title::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: -1px;
+      width: 56px;
+      height: 2px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      opacity: 0.9;
     }
 
     .grid-metrics {
@@ -561,11 +935,20 @@
       margin-bottom: 22px;
     }
     .metric {
-      background: var(--bg1);
+      background: linear-gradient(165deg, color-mix(in srgb, var(--bg1) 100%, transparent), color-mix(in srgb, var(--bg2) 55%, transparent));
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 18px;
       box-shadow: 0 8px 32px var(--shadow);
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.2s;
+    }
+    .metric:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 44px var(--shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .metric:hover { transform: none; }
     }
     .metric label {
       display: block;
@@ -579,12 +962,17 @@
     .metric .val { font-size: 1.4rem; font-weight: 700; font-family: Syne, sans-serif; }
 
     .chart-wrap {
-      background: var(--bg1);
+      background: linear-gradient(165deg, var(--bg1), color-mix(in srgb, var(--bg2) 40%, var(--bg1)));
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 20px;
       margin-bottom: 22px;
       box-shadow: 0 8px 32px var(--shadow);
+      transition: box-shadow 0.25s ease, border-color 0.2s;
+    }
+    .chart-wrap:hover {
+      box-shadow: 0 14px 40px var(--shadow);
+      border-color: color-mix(in srgb, var(--accent) 15%, var(--border));
     }
     .chart-wrap h3 { margin: 0 0 14px; font-size: 0.88rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
     .bars {
@@ -609,11 +997,15 @@
     table.data {
       width: 100%;
       border-collapse: collapse;
-      background: var(--bg1);
+      background: linear-gradient(180deg, var(--bg1), color-mix(in srgb, var(--bg2) 35%, var(--bg1)));
       border: 1px solid var(--border);
       border-radius: var(--radius);
       overflow: hidden;
       box-shadow: 0 8px 32px var(--shadow);
+      transition: box-shadow 0.25s ease;
+    }
+    table.data:hover {
+      box-shadow: 0 12px 36px var(--shadow);
     }
     table.data th, table.data td {
       padding: 12px 14px;
@@ -630,6 +1022,11 @@
     }
     table.data tr:last-child td { border-bottom: 0; }
     table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent) 4%, var(--bg1)); }
+    table.data td:last-child {
+      text-align: center;
+      vertical-align: middle;
+    }
+    table.data th:last-child { text-align: center; }
 
     .progress {
       height: 8px;
@@ -648,9 +1045,24 @@
     .toolbar {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 16px;
+      gap: 12px;
+      margin-bottom: 22px;
       align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+    }
+    .toolbar .mono {
+      flex: 1 1 100%;
+      text-align: center;
+    }
+    @media (min-width: 640px) {
+      .toolbar {
+        justify-content: flex-start;
+      }
+      .toolbar .mono {
+        flex: 0 1 auto;
+        text-align: left;
+      }
     }
     input.inp, select.inp, textarea.inp {
       border: 1px solid var(--border);
@@ -664,26 +1076,94 @@
     }
     input.inp:focus, textarea.inp:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
     .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       border: 0;
-      border-radius: var(--radius-sm);
-      padding: 11px 18px;
+      border-radius: 12px;
+      padding: 12px 22px;
+      min-height: 44px;
       font-weight: 700;
       cursor: pointer;
       font-size: 0.88rem;
       font-family: inherit;
+      letter-spacing: 0.02em;
+      transition: transform 0.2s ease, box-shadow 0.28s ease, filter 0.2s, border-color 0.2s, background 0.2s, color 0.2s;
+      box-sizing: border-box;
     }
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      background: linear-gradient(145deg, var(--accent2), var(--accent));
       color: #0a0a0f;
+      box-shadow:
+        0 1px 0 color-mix(in srgb, var(--txt) 25%, transparent) inset,
+        0 8px 24px color-mix(in srgb, var(--accent) 28%, transparent),
+        0 2px 8px var(--shadow);
     }
     :root[data-theme="light"] .btn-primary { color: #fff; }
-    .btn-danger { background: var(--red); color: #fff; }
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(1.06);
+      transform: translateY(-2px);
+      box-shadow:
+        0 1px 0 color-mix(in srgb, var(--txt) 30%, transparent) inset,
+        0 14px 36px color-mix(in srgb, var(--accent) 38%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--accent2) 35%, transparent);
+    }
+    .btn-primary:active:not(:disabled) {
+      transform: translateY(0);
+      filter: brightness(0.97);
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+    .btn-danger {
+      background: linear-gradient(145deg, color-mix(in srgb, var(--red) 92%, #fff), var(--red));
+      color: #fff;
+      box-shadow: 0 4px 18px color-mix(in srgb, var(--red) 35%, transparent);
+    }
+    .btn-danger:hover:not(:disabled) {
+      filter: brightness(1.08);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px color-mix(in srgb, var(--red) 45%, transparent);
+    }
+    .btn-danger:active:not(:disabled) {
+      transform: translateY(0);
+    }
     .btn-ghost {
-      background: var(--bg2);
+      background: linear-gradient(165deg, color-mix(in srgb, var(--bg2) 100%, transparent), color-mix(in srgb, var(--bg1) 85%, transparent));
       color: var(--txt);
       border: 1px solid var(--border);
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--txt) 4%, transparent) inset;
     }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ghost:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+      background: color-mix(in srgb, var(--accent) 10%, var(--bg2));
+      color: var(--accent2);
+      transform: translateY(-2px);
+      box-shadow:
+        0 1px 0 color-mix(in srgb, var(--txt) 6%, transparent) inset,
+        0 8px 24px var(--shadow);
+    }
+    .btn-ghost:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    .btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+    }
+    .btn-danger:focus-visible {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 35%, transparent);
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+    table.data .btn {
+      padding: 9px 14px;
+      min-height: 38px;
+      font-size: 0.8rem;
+      border-radius: 10px;
+    }
+    .btn-login-wide {
+      width: 100%;
+      margin-top: 8px;
+      text-align: center;
+    }
 
     .config-pre {
       margin: 0;
@@ -707,29 +1187,999 @@
       font-weight: 600;
     }
 
+    /* ——— Сервер: те же токены, что и тема (tg-dark / crm / light / violet) ——— */
+    .srv-dashboard {
+      --srv-page: color-mix(in srgb, var(--bg2) 38%, var(--bg0));
+      --srv-card: var(--bg1);
+      --srv-inner: var(--bg2);
+      --srv-text: var(--txt);
+      --srv-muted: var(--muted);
+      --srv-border: var(--border);
+      --srv-teal: color-mix(in srgb, var(--green) 72%, var(--txt));
+      --srv-gauge-stroke: color-mix(in srgb, var(--green) 80%, #a8e6d9);
+      --srv-track: color-mix(in srgb, var(--muted) 28%, var(--bg2));
+      --srv-shadow: 0 1px 3px var(--shadow), 0 10px 36px var(--shadow);
+      margin: -6px -26px 0;
+      padding: 22px 26px 36px;
+      border-radius: 18px;
+      background: var(--srv-page);
+      color: var(--srv-text);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent);
+    }
+    :root[data-theme="light"] .srv-dashboard {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    }
+    @media (max-width: 900px) {
+      .srv-dashboard {
+        margin-left: -16px;
+        margin-right: -16px;
+        padding-left: 16px;
+        padding-right: 16px;
+        border-radius: 14px;
+      }
+    }
+    .srv-dash-intro {
+      margin-bottom: 20px;
+    }
+    .srv-dash-h2 {
+      font-family: Syne, var(--font), sans-serif;
+      font-weight: 800;
+      font-size: 1.45rem;
+      letter-spacing: -0.03em;
+      margin: 0 0 6px;
+      color: var(--srv-text);
+    }
+    .srv-dash-lead {
+      margin: 0;
+      font-size: 0.88rem;
+      color: var(--srv-muted);
+      line-height: 1.45;
+    }
+    .srv-dash-card {
+      background: var(--srv-card);
+      border: 1px solid var(--srv-border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: var(--srv-shadow);
+      transition: box-shadow 0.22s ease, border-color 0.2s;
+    }
+    .srv-dash-card:hover {
+      box-shadow: 0 2px 8px var(--shadow), 0 14px 42px var(--shadow);
+      border-color: color-mix(in srgb, var(--srv-gauge-stroke) 28%, var(--srv-border));
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .srv-dash-card:hover { transform: none; }
+    }
+    .srv-dash-card-head {
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--srv-border);
+      color: var(--srv-text);
+      letter-spacing: -0.015em;
+      background: linear-gradient(180deg, var(--srv-card) 0%, var(--srv-inner) 100%);
+    }
+    .srv-dash-card-body {
+      padding: 16px 18px 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .srv-dash-card-body--block {
+      display: block;
+    }
+    .srv-gauges {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px 8px;
+      padding: 8px 4px 4px;
+    }
+    @media (max-width: 900px) {
+      .srv-gauges {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (max-width: 400px) {
+      .srv-gauges {
+        grid-template-columns: 1fr;
+      }
+    }
+    .srv-gauge {
+      text-align: center;
+      max-width: 200px;
+      margin: 0 auto;
+    }
+    /* Дуга ¾ окружности (270°), прорезь снизу 90° — две дуги по 135° через вершину */
+    .srv-g-chart {
+      position: relative;
+      width: 100%;
+      max-width: 136px;
+      margin: 0 auto 4px;
+    }
+    .srv-g-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+    .srv-g-track {
+      fill: none;
+      stroke: var(--srv-track);
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .srv-g-fill {
+      --pct: 0;
+      fill: none;
+      stroke: var(--srv-gauge-stroke);
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-dasharray: 100;
+      stroke-dashoffset: calc(100 - var(--pct));
+      transition: stroke-dashoffset 0.5s cubic-bezier(0.33, 1, 0.68, 1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .srv-g-fill { transition: none; }
+    }
+    .srv-g-pct {
+      position: absolute;
+      left: 50%;
+      /* центр окружности в viewBox (50, 58) при viewBox="0 9 100 82" → (58-9)/82 от верха SVG */
+      top: 59.76%;
+      transform: translate(-50%, -50%);
+      font-size: 1.08rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--srv-text);
+      line-height: 1.1;
+      pointer-events: none;
+      font-variant-numeric: tabular-nums;
+    }
+    .srv-gauge-title {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--srv-muted);
+      margin-top: 6px;
+    }
+    .srv-gauge-title svg {
+      width: 14px;
+      height: 14px;
+      opacity: 0.85;
+      color: var(--srv-teal);
+      flex-shrink: 0;
+    }
+    .srv-gauge-sub {
+      font-size: 0.72rem;
+      color: var(--srv-muted);
+      margin-top: 5px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    /* Сервер — только цвет дуги по нагрузке (пороги как у сводки); карточку не заливаем */
+    #sec-server .srv-gauge[class*="srv-gauge-tint"] .srv-g-fill {
+      transition: stroke 0.35s ease, stroke-dashoffset 0.5s cubic-bezier(0.33, 1, 0.68, 1), filter 0.3s ease;
+    }
+    #sec-server .srv-gauge.srv-gauge-tint-neutral .srv-g-fill {
+      stroke: #7dd3fc;
+    }
+    #sec-server .srv-gauge.srv-gauge-tint-low .srv-g-fill {
+      stroke: #38bdf8;
+      filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.35));
+    }
+    #sec-server .srv-gauge.srv-gauge-tint-mid .srv-g-fill {
+      stroke: #4ade80;
+      filter: drop-shadow(0 0 4px rgba(74, 222, 128, 0.35));
+    }
+    #sec-server .srv-gauge.srv-gauge-tint-high .srv-g-fill {
+      stroke: #fbbf24;
+      filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.45));
+    }
+    #sec-server .srv-gauge.srv-gauge-tint-crit .srv-g-fill {
+      stroke: #f87171;
+      filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.5));
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #sec-server .srv-gauge[class*="srv-gauge-tint"] .srv-g-fill {
+        filter: none;
+        transition: none;
+      }
+    }
+    .srv-dash-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 640px) {
+      .srv-dash-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .srv-dash-card--wide {
+      grid-column: 1 / -1;
+    }
+    .srv-dashboard .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      line-height: 1.2;
+      padding: 3px 9px;
+      border: 1px solid var(--srv-border);
+      background: var(--srv-inner);
+      color: var(--srv-text);
+    }
+    .srv-dashboard .pill-ok {
+      border-color: color-mix(in srgb, var(--srv-gauge-stroke) 48%, var(--srv-border));
+      background: color-mix(in srgb, var(--srv-gauge-stroke) 14%, var(--srv-card));
+      color: color-mix(in srgb, var(--srv-gauge-stroke) 62%, var(--srv-text));
+    }
+    .srv-dashboard .pill-bad {
+      border-color: color-mix(in srgb, var(--red) 38%, var(--srv-border));
+      background: color-mix(in srgb, var(--red) 12%, transparent);
+      color: var(--red);
+    }
+    .srv-dashboard .pill-muted {
+      color: var(--srv-muted);
+      font-weight: 500;
+      border-style: dashed;
+      background: var(--srv-card);
+    }
+    .srv-traffic-split {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 480px) {
+      .srv-traffic-split {
+        grid-template-columns: 1fr;
+      }
+    }
+    .srv-traffic-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: var(--srv-inner);
+      border: 1px solid var(--srv-border);
+    }
+    .srv-traffic-lab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--srv-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .srv-traffic-lab svg {
+      width: 18px;
+      height: 18px;
+      color: var(--srv-teal);
+      flex-shrink: 0;
+    }
+    .srv-traffic-val {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--srv-text);
+      font-variant-numeric: tabular-nums;
+    }
+    .srv-domain-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .srv-domain-row svg {
+      width: 18px;
+      height: 18px;
+      color: var(--srv-teal);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .srv-domain-val {
+      font-size: 0.88rem;
+      font-weight: 600;
+      word-break: break-all;
+      color: var(--srv-text);
+    }
+    .srv-dashboard table.data {
+      background: var(--srv-card);
+      border-color: var(--srv-border);
+      box-shadow: var(--srv-shadow);
+    }
+    .srv-dashboard table.data:hover {
+      box-shadow: 0 2px 8px var(--shadow), 0 12px 36px var(--shadow);
+    }
+    .srv-dashboard table.data th {
+      background: var(--srv-inner);
+      color: var(--srv-muted);
+      border-bottom-color: var(--srv-border);
+    }
+    .srv-dashboard table.data th,
+    .srv-dashboard table.data td {
+      padding: 13px 16px;
+      border-bottom-color: var(--srv-border);
+      color: var(--srv-text);
+      line-height: 1.45;
+    }
+    .srv-dashboard table.data td {
+      font-size: 0.88rem;
+    }
+    .srv-dashboard table.data th {
+      font-size: 0.72rem;
+      vertical-align: middle;
+    }
+    .srv-dashboard table.data tbody tr:hover td {
+      background: color-mix(in srgb, var(--srv-teal) 6%, var(--srv-card));
+    }
+    .srv-dashboard table.data .btn.btn-ghost {
+      border-color: var(--srv-border);
+      color: var(--srv-text);
+      background: var(--srv-inner);
+    }
+    .srv-dashboard table.data .btn.btn-ghost:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--srv-teal) 35%, var(--srv-border));
+      color: var(--srv-teal);
+    }
+    .srv-dashboard table.data .btn.btn-primary {
+      background: linear-gradient(135deg, var(--srv-gauge-stroke), var(--srv-teal));
+      border-color: transparent;
+      color: #fff;
+    }
+    .srv-dashboard table.data .status-pill {
+      padding: 3px 8px;
+      font-size: 0.68rem;
+      border-radius: 999px;
+    }
+    .srv-dashboard table.data .status-pill.ok {
+      background: color-mix(in srgb, var(--srv-gauge-stroke) 14%, transparent);
+      color: color-mix(in srgb, var(--srv-gauge-stroke) 62%, var(--srv-text));
+      border: 1px solid color-mix(in srgb, var(--srv-gauge-stroke) 35%, var(--srv-border));
+    }
+    .srv-dashboard table.data .status-pill.bad {
+      background: color-mix(in srgb, var(--red) 12%, transparent);
+      color: var(--red);
+      border: 1px solid color-mix(in srgb, var(--red) 32%, var(--srv-border));
+    }
+    .srv-dash-hero {
+      margin-bottom: 16px;
+    }
+    /* Обзор / пользователи / конфиг — те же карточки и токены */
+    .srv-dashboard .grid-metrics {
+      margin: 0;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+    .srv-dashboard .metric {
+      position: relative;
+      background: linear-gradient(145deg, color-mix(in srgb, var(--srv-card) 55%, var(--srv-inner)), var(--srv-inner));
+      border: 1px solid var(--srv-border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: 0 1px 0 color-mix(in srgb, var(--srv-text) 4%, transparent) inset;
+      transition: border-color 0.2s ease, box-shadow 0.22s ease;
+    }
+    .srv-dashboard .metric--wide {
+      grid-column: 1 / -1;
+    }
+    .srv-dashboard .metric:hover {
+      transform: none;
+      border-color: color-mix(in srgb, var(--srv-gauge-stroke) 32%, var(--srv-border));
+      box-shadow: 0 1px 3px var(--shadow), 0 0 0 1px color-mix(in srgb, var(--srv-gauge-stroke) 12%, transparent);
+    }
+    .srv-dashboard .metric label {
+      color: var(--srv-muted);
+      font-size: 0.68rem;
+      letter-spacing: 0.055em;
+      margin-bottom: 10px;
+      line-height: 1.35;
+    }
+    .srv-dashboard .metric .val {
+      color: var(--srv-text);
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.3;
+      font-family: Syne, var(--font), sans-serif;
+    }
+    .srv-dashboard .metric--wide .val {
+      font-size: 1.05rem;
+      font-weight: 700;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+    }
+    .srv-dashboard .metric .muted {
+      color: var(--srv-muted);
+      line-height: 1.45;
+    }
+    /* Обзор — «Сводка по ноде»: компактные карточки одинаковой высоты */
+    .srv-dashboard .overview-summary {
+      margin-bottom: 0;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+      grid-auto-rows: 1fr;
+    }
+    @media (min-width: 768px) {
+      .srv-dashboard .overview-summary {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+    .srv-dashboard .overview-summary .metric {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 12px 12px 14px;
+      border-radius: 14px;
+      min-height: 104px;
+      box-sizing: border-box;
+    }
+    .srv-dashboard .overview-summary .metric--wide {
+      padding: 14px 16px 16px;
+      min-height: auto;
+    }
+    .srv-dashboard .overview-summary .metric label {
+      display: block;
+      width: 100%;
+      margin-bottom: 8px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--srv-muted) 88%, var(--srv-text));
+      line-height: 1.3;
+      max-width: 28rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .srv-dashboard .overview-summary .metric:not(.metric--wide) .val {
+      font-family: "Inter", var(--font), system-ui, sans-serif;
+      font-weight: 700;
+      font-size: clamp(1.05rem, 2.2vw, 1.32rem);
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums lining-nums;
+      line-height: 1.2;
+      color: var(--srv-text);
+    }
+    .srv-dashboard .overview-summary .metric--wide .val.overview-summary-url {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-weight: 500;
+      font-size: 0.9rem;
+      letter-spacing: 0.02em;
+      line-height: 1.65;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      color: color-mix(in srgb, var(--srv-text) 92%, var(--srv-teal));
+      max-width: min(100%, 52rem);
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .srv-dashboard .overview-summary .overview-summary-hint,
+    .srv-dashboard .overview-summary .overview-summary-sub {
+      font-family: "Inter", var(--font), system-ui, sans-serif;
+      font-size: 0.72rem;
+      font-weight: 400;
+      line-height: 1.4;
+      color: var(--srv-muted);
+      max-width: 38rem;
+      margin-left: auto;
+      margin-right: auto;
+      margin-top: 6px;
+    }
+    .srv-dashboard .overview-summary .overview-summary-sub {
+      margin-top: 5px;
+      font-size: 0.7rem;
+      opacity: 0.92;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    /* Заливка сводки: #sec-overview — выше специфичности, чем .srv-dashboard .metric (иначе shorthand background перетирает longhands).
+       Дублируем цвет ::before — слой поверх серого градиента карточки.
+       Пороги нагрузки задаются в JS: красный ≥80 %, оранжевый ≥55 %, зелёный ≥30 %, иначе голубой. */
+    #sec-overview .overview-summary .metric[class*="metric-tint"] {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      transition: background 0.35s ease, border-color 0.3s ease, box-shadow 0.3s ease, filter 0.2s ease;
+    }
+    #sec-overview .overview-summary .metric[class*="metric-tint"] > * {
+      position: relative;
+      z-index: 1;
+    }
+    #sec-overview .overview-summary .metric[class*="metric-tint"]::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 0;
+    }
+    #sec-overview .overview-summary .metric.metric-tint-neutral {
+      background: linear-gradient(145deg, var(--srv-card), var(--srv-inner)) !important;
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05) inset,
+        inset 0 0 44px rgba(96, 165, 250, 0.22) !important;
+      border-color: rgba(96, 165, 250, 0.35) !important;
+    }
+    #sec-overview .overview-summary .metric.metric-tint-neutral::before {
+      background: linear-gradient(160deg, rgba(96, 165, 250, 0.35) 0%, rgba(45, 212, 191, 0.18) 100%);
+    }
+    #sec-overview .overview-summary .metric.metric-tint-low {
+      background: linear-gradient(145deg, var(--srv-card), var(--srv-inner)) !important;
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05) inset,
+        inset 0 0 52px rgba(56, 189, 248, 0.5) !important;
+      border-color: rgba(59, 130, 246, 0.55) !important;
+    }
+    #sec-overview .overview-summary .metric.metric-tint-low::before {
+      background: linear-gradient(155deg, rgba(59, 130, 246, 0.58) 0%, rgba(6, 182, 212, 0.38) 100%);
+    }
+    #sec-overview .overview-summary .metric.metric-tint-mid {
+      background: linear-gradient(145deg, var(--srv-card), var(--srv-inner)) !important;
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05) inset,
+        inset 0 0 52px rgba(52, 211, 153, 0.45) !important;
+      border-color: rgba(34, 197, 94, 0.55) !important;
+    }
+    #sec-overview .overview-summary .metric.metric-tint-mid::before {
+      background: linear-gradient(155deg, rgba(34, 197, 94, 0.55) 0%, rgba(20, 184, 166, 0.35) 100%);
+    }
+    #sec-overview .overview-summary .metric.metric-tint-high {
+      background: linear-gradient(145deg, var(--srv-card), var(--srv-inner)) !important;
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05) inset,
+        inset 0 0 52px rgba(245, 158, 11, 0.48) !important;
+      border-color: rgba(245, 158, 11, 0.6) !important;
+    }
+    #sec-overview .overview-summary .metric.metric-tint-high::before {
+      background: linear-gradient(155deg, rgba(245, 158, 11, 0.58) 0%, rgba(251, 191, 36, 0.38) 100%);
+    }
+    #sec-overview .overview-summary .metric.metric-tint-crit {
+      background: linear-gradient(145deg, var(--srv-card), var(--srv-inner)) !important;
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.05) inset,
+        inset 0 0 56px rgba(239, 68, 68, 0.52) !important;
+      border-color: rgba(239, 68, 68, 0.62) !important;
+    }
+    #sec-overview .overview-summary .metric.metric-tint-crit::before {
+      background: linear-gradient(155deg, rgba(239, 68, 68, 0.6) 0%, rgba(248, 113, 113, 0.4) 100%);
+    }
+    #sec-overview .overview-summary .metric.metric-tint-low:hover,
+    #sec-overview .overview-summary .metric.metric-tint-mid:hover,
+    #sec-overview .overview-summary .metric.metric-tint-high:hover,
+    #sec-overview .overview-summary .metric.metric-tint-crit:hover,
+    #sec-overview .overview-summary .metric.metric-tint-neutral:hover {
+      filter: brightness(1.05);
+    }
+    :root[data-theme="light"] #sec-overview .overview-summary .metric.metric-tint-neutral {
+      background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;
+      box-shadow: inset 0 0 40px rgba(59, 130, 246, 0.16) !important;
+      border-color: rgba(59, 130, 246, 0.35) !important;
+    }
+    :root[data-theme="light"] #sec-overview .overview-summary .metric.metric-tint-neutral::before {
+      background: linear-gradient(160deg, rgba(59, 130, 246, 0.22) 0%, rgba(45, 212, 191, 0.12) 100%);
+    }
+    :root[data-theme="light"] #sec-overview .overview-summary .metric.metric-tint-low {
+      background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%) !important;
+      box-shadow: inset 0 0 44px rgba(59, 130, 246, 0.28) !important;
+      border-color: rgba(37, 99, 235, 0.45) !important;
+    }
+    :root[data-theme="light"] #sec-overview .overview-summary .metric.metric-tint-low::before {
+      background: linear-gradient(160deg, rgba(59, 130, 246, 0.38) 0%, rgba(14, 165, 233, 0.22) 100%);
+    }
+    :root[data-theme="light"] #sec-overview .overview-summary .metric.metric-tint-mid {
+      background: linear-gradient(180deg, #ecfdf5 0%, #f8fafc 100%) !important;
+      box-shadow: inset 0 0 44px rgba(34, 197, 94, 0.22) !important;
+      border-color: rgba(22, 163, 74, 0.45) !important;
+    }
+    :root[data-theme="light"] #sec-overview .overview-summary .metric.metric-tint-mid::before {
+      background: linear-gradient(160deg, rgba(34, 197, 94, 0.35) 0%, rgba(20, 184, 166, 0.2) 100%);
+    }
+    :root[data-theme="light"] #sec-overview .overview-summary .metric.metric-tint-high {
+      background: linear-gradient(180deg, #fffbeb 0%, #fafaf9 100%) !important;
+      box-shadow: inset 0 0 44px rgba(245, 158, 11, 0.28) !important;
+      border-color: rgba(217, 119, 6, 0.5) !important;
+    }
+    :root[data-theme="light"] #sec-overview .overview-summary .metric.metric-tint-high::before {
+      background: linear-gradient(160deg, rgba(245, 158, 11, 0.4) 0%, rgba(251, 191, 36, 0.24) 100%);
+    }
+    :root[data-theme="light"] #sec-overview .overview-summary .metric.metric-tint-crit {
+      background: linear-gradient(180deg, #fef2f2 0%, #fafaf9 100%) !important;
+      box-shadow: inset 0 0 44px rgba(239, 68, 68, 0.26) !important;
+      border-color: rgba(220, 38, 38, 0.5) !important;
+    }
+    :root[data-theme="light"] #sec-overview .overview-summary .metric.metric-tint-crit::before {
+      background: linear-gradient(160deg, rgba(239, 68, 68, 0.38) 0%, rgba(252, 165, 165, 0.22) 100%);
+    }
+    .srv-dashboard .overview-chart-block {
+      padding-top: 4px;
+      padding-bottom: 10px;
+    }
+    .srv-dashboard .overview-bars-panel {
+      position: relative;
+      padding: 12px 10px 8px;
+      border-radius: 12px;
+      background: var(--srv-inner);
+      border: 1px solid var(--srv-border);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--srv-text) 3%, transparent);
+    }
+    /* График на всю ширину тела карточки, без горизонтального скролла */
+    .srv-dashboard .overview-bars-panel--fluid {
+      margin-left: -18px;
+      margin-right: -18px;
+      width: calc(100% + 36px);
+      padding: 18px 12px 16px;
+      border-radius: 14px;
+    }
+    @media (max-width: 520px) {
+      .srv-dashboard .overview-bars-panel--fluid {
+        margin-left: -14px;
+        margin-right: -14px;
+        width: calc(100% + 28px);
+        padding: 14px 8px 14px;
+      }
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bars {
+      width: 100%;
+      min-height: 208px;
+      gap: clamp(2px, 0.65vw, 8px);
+      padding: 8px 4px 0;
+      justify-content: stretch;
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bar-col {
+      position: relative;
+      z-index: 0;
+      flex: 1 1 0;
+      min-width: 0;
+      max-width: none;
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bar-col:hover {
+      z-index: 4;
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bar {
+      position: relative;
+      width: min(100%, 34px);
+      max-width: 100%;
+      border-radius: 12px 12px 6px 6px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      overflow: visible;
+      box-sizing: border-box;
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bar--empty {
+      opacity: 0.35;
+    }
+    /* Текст объёма внутри столбца, «читается» снизу вверх вдоль свечи */
+    .srv-dashboard .overview-bars-panel--fluid .bar-val-inside {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-90deg);
+      transform-origin: center center;
+      white-space: nowrap;
+      font-size: clamp(0.48rem, 1.05vw, 0.64rem);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.04em;
+      line-height: 1;
+      color: rgba(255, 255, 255, 0.96);
+      text-shadow:
+        0 0 10px rgba(0, 0, 0, 0.35),
+        0 1px 3px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+      max-width: none;
+    }
+    :root[data-theme="light"] .srv-dashboard .overview-bars-panel--fluid .bar-val-inside {
+      color: rgba(15, 23, 42, 0.92);
+      text-shadow:
+        0 0 8px rgba(255, 255, 255, 0.65),
+        0 1px 2px rgba(255, 255, 255, 0.4);
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bar-label--stacked {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 3px;
+      padding-top: 8px;
+      min-height: 2.85em;
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bar-label-wd {
+      font-size: clamp(0.58rem, 1.25vw, 0.78rem);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: var(--srv-text);
+      line-height: 1.1;
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bar-label-dt {
+      font-size: clamp(0.54rem, 1.1vw, 0.72rem);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: color-mix(in srgb, var(--srv-muted) 82%, var(--srv-text));
+      line-height: 1.1;
+    }
+    .srv-dashboard .overview-bars-panel::after {
+      content: "";
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 36px;
+      height: 1px;
+      background: color-mix(in srgb, var(--srv-muted) 22%, transparent);
+      pointer-events: none;
+    }
+    .srv-dashboard .overview-bars-panel--fluid::after {
+      left: 16px;
+      right: 16px;
+      bottom: 52px;
+    }
+    .srv-dashboard .bars {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 4px;
+      min-height: 176px;
+      height: auto;
+      padding: 4px 4px 0;
+      position: relative;
+      z-index: 1;
+    }
+    @media (max-width: 520px) {
+      .srv-dashboard .bars {
+        gap: 2px;
+        min-height: 168px;
+      }
+      .srv-dashboard .overview-bars-panel:not(.overview-bars-panel--fluid)::after {
+        bottom: 40px;
+      }
+      .srv-dashboard .overview-bars-panel--fluid::after {
+        bottom: 50px;
+        left: 10px;
+        right: 10px;
+      }
+    }
+    .srv-dashboard .bar-col {
+      flex: 1 1 0;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+    .srv-dashboard .bar-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      gap: 6px;
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bar-stack {
+      gap: 2px;
+    }
+    .srv-dashboard .bar-val {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--srv-muted);
+      text-align: center;
+      line-height: 1.2;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      min-height: 1.2em;
+    }
+    .srv-dashboard .bar {
+      width: 100%;
+      max-width: 46px;
+      margin: 0 auto;
+      border-radius: 10px 10px 5px 5px;
+      background: linear-gradient(180deg, var(--srv-gauge-stroke), color-mix(in srgb, var(--srv-teal) 75%, var(--srv-gauge-stroke)));
+      box-shadow: 0 3px 10px color-mix(in srgb, var(--srv-gauge-stroke) 25%, transparent);
+      opacity: 1;
+      min-height: 4px;
+      transition: filter 0.18s ease, transform 0.18s ease;
+    }
+    .srv-dashboard .bar-col:hover .bar {
+      filter: brightness(1.12) saturate(1.05);
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bar-col:hover .bar-val-inside {
+      color: #fff;
+      text-shadow:
+        0 0 12px rgba(0, 0, 0, 0.45),
+        0 1px 4px rgba(0, 0, 0, 0.55);
+    }
+    :root[data-theme="light"] .srv-dashboard .overview-bars-panel--fluid .bar-col:hover .bar-val-inside {
+      color: #0f172a;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
+    }
+    .srv-dashboard .overview-bars-panel--fluid .bar-col:hover .bar-label-dt {
+      color: var(--srv-text);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .srv-dashboard .bar-col:hover .bar { filter: brightness(1.06); }
+    }
+    .srv-dashboard .bar-label {
+      font-size: 0.58rem;
+      font-weight: 700;
+      color: var(--srv-muted);
+      letter-spacing: 0.03em;
+      text-align: center;
+      line-height: 1.35;
+      padding-top: 2px;
+    }
+    .srv-dashboard .toolbar {
+      margin: 0;
+      width: 100%;
+      justify-content: flex-start;
+      gap: 12px;
+      padding: 0;
+    }
+    .srv-dashboard .toolbar .mono {
+      color: var(--srv-muted);
+    }
+    @media (min-width: 640px) {
+      .srv-dashboard .toolbar .mono {
+        flex: 0 1 auto;
+      }
+    }
+    .srv-dashboard .toolbar .inp {
+      background: var(--srv-card);
+      border-color: var(--srv-border);
+      flex: 1 1 220px;
+      min-width: 0;
+    }
+    .srv-dashboard .config-badge {
+      margin: 0 0 16px;
+      background: color-mix(in srgb, var(--amber) 16%, var(--srv-inner));
+      color: var(--amber);
+      border: 1px solid color-mix(in srgb, var(--amber) 28%, var(--srv-border));
+    }
+    .srv-dashboard .srv-dash-card .config-pre {
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: var(--srv-inner);
+      color: var(--srv-text);
+      max-height: min(68vh, 620px);
+    }
+    .srv-dashboard > .srv-dash-card + .srv-dash-card {
+      margin-top: 16px;
+    }
+    .srv-dashboard > .srv-dash-card + .srv-mgmt-title {
+      margin-top: 22px;
+    }
+    .srv-mgmt-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--srv-muted);
+      margin: 10px 0 12px;
+    }
+    .srv-dashboard > table.data {
+      margin-bottom: 22px;
+    }
+    .srv-dashboard .srv-dash-card + table.data {
+      margin-top: 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 13px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg2) 85%, transparent);
+      color: var(--txt);
+    }
+    .pill-ok {
+      border-color: color-mix(in srgb, var(--green) 42%, transparent);
+      background: color-mix(in srgb, var(--green) 14%, transparent);
+      color: var(--green);
+    }
+    .pill-bad {
+      border-color: color-mix(in srgb, var(--red) 38%, transparent);
+      background: color-mix(in srgb, var(--red) 12%, transparent);
+      color: var(--red);
+    }
+    .pill-muted {
+      color: var(--muted);
+      font-weight: 500;
+      border-style: dashed;
+    }
+
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.55);
-      backdrop-filter: blur(4px);
+      background: rgba(0,0,0,0.58);
+      backdrop-filter: blur(8px) saturate(120%);
       display: grid;
       place-items: center;
       z-index: 100;
       padding: 16px;
+      animation: modalBackdropIn 0.22s ease;
+    }
+    @keyframes modalBackdropIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
     .modal {
-      background: var(--bg1);
+      position: relative;
+      background: color-mix(in srgb, var(--bg1) 88%, transparent);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 26px;
+      border-radius: calc(var(--radius) + 4px);
+      padding: 28px 26px 24px;
       width: min(420px, 100%);
       max-height: 90vh;
       overflow: auto;
-      box-shadow: 0 32px 80px var(--shadow);
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--txt) 5%, transparent) inset,
+        0 32px 80px var(--shadow);
+      backdrop-filter: blur(20px) saturate(160%);
+      animation: modalPop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
     }
-    .modal h3 { margin: 0 0 14px; font-family: Syne, sans-serif; font-weight: 800; }
+    @keyframes modalPop {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 12px;
+      right: 12px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 45%, transparent), transparent);
+      border-radius: 2px;
+      pointer-events: none;
+    }
+    .modal h3 { margin: 0 0 16px; font-family: Syne, sans-serif; font-weight: 800; letter-spacing: -0.02em; }
     .field { margin-bottom: 14px; }
     .field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+    .modal-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+      margin-top: 28px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .modal-footer .btn {
+      flex: 1 1 auto;
+      min-width: min(140px, 100%);
+      max-width: 100%;
+    }
+    @media (min-width: 420px) {
+      .modal-footer .btn {
+        flex: 0 1 auto;
+        min-width: 120px;
+      }
+    }
 
     .toast {
       position: fixed;
@@ -792,7 +2242,7 @@
         <form id="form-login" style="margin-top:18px;">
           <div class="field"><label for="inp-login">Логин</label><input class="inp" id="inp-login" autocomplete="username" required /></div>
           <div class="field"><label for="inp-pass">Пароль</label><input class="inp" id="inp-pass" type="password" autocomplete="current-password" required /></div>
-          <button type="submit" class="btn btn-primary" style="width:100%;margin-top:6px;">Войти</button>
+          <button type="submit" class="btn btn-primary btn-login-wide">Войти</button>
           <p id="login-err" class="mono" style="color:var(--red);min-height:1.2em;margin-top:12px;font-size:0.85rem;"></p>
         </form>
       </div>
@@ -802,106 +2252,348 @@
   <div id="view-app" class="hidden">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <button type="button" class="btn-icon mobile-nav-btn" id="btn-menu" aria-label="Меню">☰</button>
+        <button type="button" class="btn-icon mobile-nav-btn" id="btn-menu" aria-label="Меню"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
         <h1>HY2 <span class="badge-node mono" id="hdr-node">—</span></h1>
         <span class="status-pill ok mono" id="hdr-online">онлайн</span>
         <span class="mono" style="font-size:0.74rem;color:var(--muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="hdr-ver">—</span>
       </div>
       <div class="topbar-actions">
-        <div class="auto-refresh-toolbar" title="Автообновление данных текущего раздела (Обзор / Пользователи / Сервер)">
-          <label><input type="checkbox" id="auto-refresh-on" /> Авто</label>
-          <select id="auto-refresh-interval" aria-label="Интервал автообновления">
-            <option value="5">5 сек</option>
-            <option value="10">10 сек</option>
-            <option value="30">30 сек</option>
-            <option value="60">60 сек</option>
-          </select>
-          <span id="hdr-last-refresh" class="mono">—</span>
+        <div class="refresh-split-wrap" id="refresh-split-wrap">
+          <div class="refresh-split" role="group" aria-label="Обновление данных">
+            <button type="button" class="refresh-split-left" id="btn-refresh-now" title="Обновить сейчас">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 10-2.64 6.36"/><path d="M21 3v7h-7"/></svg>
+            </button>
+            <button type="button" class="refresh-split-right" id="btn-refresh-menu" title="Автообновление и интервал" aria-expanded="false" aria-haspopup="dialog" aria-controls="refresh-popover">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </div>
+          <div id="refresh-popover" class="refresh-popover hidden" role="dialog" aria-label="Параметры автообновления">
+            <div class="refresh-popover-arrow" aria-hidden="true"></div>
+            <div class="refresh-popover-inner">
+              <div class="refresh-popover-row">
+                <label class="refresh-switch-label">
+                  <input type="checkbox" id="auto-refresh-on" class="refresh-switch-input" />
+                  <span class="refresh-switch-ui" aria-hidden="true"></span>
+                </label>
+                <span class="refresh-popover-title">Автообновление</span>
+              </div>
+              <hr class="refresh-popover-divider" />
+              <div class="refresh-popover-field">
+                <label class="refresh-interval-label" for="auto-refresh-interval">Интервал</label>
+                <select id="auto-refresh-interval" class="refresh-interval-select" aria-label="Интервал автообновления">
+                  <option value="5">5s</option>
+                  <option value="10">10s</option>
+                  <option value="30">30s</option>
+                  <option value="60">60s</option>
+                </select>
+              </div>
+              <p class="refresh-popover-foot mono" id="hdr-last-refresh">—</p>
+            </div>
+          </div>
         </div>
-        <button type="button" class="btn-icon" id="btn-refresh-now" title="Обновить сейчас">↻</button>
-        <button type="button" class="btn-icon" id="btn-theme" title="Сменить тему">Тема</button>
+        <div class="login-theme-dd topbar-theme-dd" id="app-theme-dd">
+          <button type="button" class="login-theme-dd-trigger" id="btn-theme" aria-expanded="false" aria-haspopup="listbox" aria-controls="app-theme-menu" title="Тема оформления">
+            <span class="login-theme-dd-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M12 2.25a9.75 9.75 0 100 19.5 9.75 9.75 0 000-19.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M12 2.25v19.5" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="8" cy="13" r="2" fill="currentColor" opacity="0.45"/>
+                <circle cx="12" cy="8" r="2" fill="currentColor" opacity="0.55"/>
+                <circle cx="16" cy="13" r="2" fill="currentColor" opacity="0.35"/>
+              </svg>
+            </span>
+            <span class="login-theme-dd-label" id="app-theme-current-label">TG Dark</span>
+            <svg class="login-theme-dd-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <ul class="login-theme-dd-menu hidden" id="app-theme-menu" role="listbox" aria-label="Тема оформления">
+            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="tg-dark">TG Dark</button></li>
+            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="crm-soft">CRM soft</button></li>
+            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="light">Светлая</button></li>
+            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="accent-violet">Violet</button></li>
+          </ul>
+        </div>
         <button type="button" class="btn-icon" id="btn-logout">Выход</button>
       </div>
     </header>
 
+    <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">
-        <div class="t">Разделы</div>
-        <div class="n">Нода</div>
+      <div class="sidebar-inner">
+        <div class="sidebar-brand">
+          <div class="t">Разделы</div>
+          <div class="n">Нода</div>
+        </div>
+        <button type="button" class="nav-btn active" data-section="overview">Обзор</button>
+        <button type="button" class="nav-btn" data-section="users">Пользователи</button>
+        <button type="button" class="nav-btn" data-section="config">Конфигурация</button>
+        <button type="button" class="nav-btn" data-section="server">Сервер</button>
       </div>
-      <button type="button" class="nav-btn active" data-section="overview"><span class="ic" aria-hidden="true">◆</span> Обзор</button>
-      <button type="button" class="nav-btn" data-section="users"><span class="ic" aria-hidden="true">◎</span> Пользователи</button>
-      <button type="button" class="nav-btn" data-section="config"><span class="ic" aria-hidden="true">◇</span> Конфигурация</button>
-      <button type="button" class="nav-btn" data-section="server"><span class="ic" aria-hidden="true">▣</span> Сервер</button>
     </aside>
 
     <main>
       <section id="sec-overview">
-        <h2 class="section-title">Обзор</h2>
-        <div class="grid-metrics">
-          <div class="metric" style="grid-column:1/-1">
-            <label>Адрес панели (HTTPS)</label>
-            <div class="val mono" style="font-size:0.78rem;word-break:break-all" id="m-panel-url">—</div>
+        <div class="srv-dashboard">
+          <header class="srv-dash-intro">
+            <h2 class="srv-dash-h2">Обзор</h2>
+          </header>
+
+          <div class="srv-dash-card srv-dash-card--wide">
+            <div class="srv-dash-card-head">Сводка по ноде</div>
+            <div class="srv-dash-card-body srv-dash-card-body--block">
+              <div class="grid-metrics overview-summary">
+                <!-- Скрыто в UI: поля остаются для скриптов / отладки -->
+                <div class="metric metric--wide hidden" aria-hidden="true">
+                  <label>Адрес панели (HTTPS)</label>
+                  <div class="val overview-summary-url" id="m-panel-url">—</div>
+                </div>
+                <div class="metric metric--wide hidden" aria-hidden="true">
+                  <label>Домен для ссылок HY2 (SNI)</label>
+                  <div class="val overview-summary-url" id="m-hy2-domain">—</div>
+                  <div class="muted overview-summary-hint">Из public_base_url / hysteria_public_domain / сертификата; для подписки HTTPS и строки hysteria2://</div>
+                </div>
+                <div class="metric metric-tint-neutral"><label>CPU</label><div class="val" id="m-cpu">—</div><div class="muted overview-summary-sub" id="m-cpu-sub">загрузка</div></div>
+                <div class="metric metric-tint-neutral"><label>ОЗУ</label><div class="val" id="m-mem">—</div><div class="muted overview-summary-sub" id="m-mem-sub">—</div></div>
+                <div class="metric metric-tint-neutral"><label>Свап</label><div class="val" id="m-swap">—</div><div class="muted overview-summary-sub" id="m-swap-sub">—</div></div>
+                <div class="metric metric-tint-neutral"><label>Онлайн (HY2)</label><div class="val" id="m-online">—</div><div class="muted overview-summary-sub" id="m-online-sub">пользователей / подключений</div></div>
+                <div class="metric metric-tint-neutral"><label>В конфиге</label><div class="val" id="m-users">—</div></div>
+                <div class="metric metric-tint-neutral"><label>Всего трафика</label><div class="val" id="m-traffic">—</div><div class="muted overview-summary-sub" title="Сумма tx+rx по пользователям в stats Hysteria (накопленно), не счётчик ОС">Накопленно (stats API)</div></div>
+                <div class="metric metric-tint-neutral"><label>Протокол</label><div class="val">QUIC / UDP</div></div>
+                <div class="metric metric-tint-neutral"><label>Uptime</label><div class="val" id="m-uptime">—</div></div>
+              </div>
+            </div>
           </div>
-          <div class="metric"><label>В конфиге</label><div class="val mono" id="m-users">—</div></div>
-          <div class="metric"><label>Онлайн (HY2)</label><div class="val mono" id="m-online">—</div><div class="muted" style="font-size:0.72rem;margin-top:6px;line-height:1.35" id="m-online-sub">пользователей / подключений</div></div>
-          <div class="metric"><label>Трафик сегодня</label><div class="val mono" id="m-traffic">—</div></div>
-          <div class="metric"><label>Протокол</label><div class="val">QUIC / UDP</div></div>
-          <div class="metric"><label>Uptime</label><div class="val mono" id="m-uptime">—</div></div>
+
+          <div class="srv-dash-card srv-dash-card--wide">
+            <div class="srv-dash-card-head">Трафик за 30 дней</div>
+            <div class="srv-dash-card-body srv-dash-card-body--block overview-chart-block">
+              <div class="overview-bars-panel overview-bars-panel--fluid">
+                <div class="bars" id="chart-bars" role="img" aria-label="Гистограмма трафика за 30 дней"></div>
+              </div>
+            </div>
+          </div>
+
+          <h3 class="srv-mgmt-title">Сессии / stats API</h3>
+          <table class="data">
+            <thead><tr><th>Идентификатор</th><th>Tx / Rx</th><th>Примечание</th></tr></thead>
+            <tbody id="tbl-conn"></tbody>
+          </table>
         </div>
-        <div class="chart-wrap">
-          <h3>Трафик за 7 дней</h3>
-          <div class="bars" id="chart-bars"></div>
-        </div>
-        <h3 style="font-size:0.88rem;color:var(--muted);margin:0 0 12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Сессии / stats API</h3>
-        <table class="data">
-          <thead><tr><th>Идентификатор</th><th>Tx / Rx</th><th>Примечание</th></tr></thead>
-          <tbody id="tbl-conn"></tbody>
-        </table>
       </section>
 
       <section id="sec-users" class="hidden">
-        <h2 class="section-title">Пользователи</h2>
-        <div class="toolbar">
-          <span class="mono" id="users-online-summary" style="font-size:0.82rem;color:var(--muted);padding:6px 0;">Онлайн: —</span>
-          <input type="search" class="inp" id="user-search" placeholder="Поиск по telegram_id…" />
-          <button type="button" class="btn btn-primary" id="btn-add-user">Добавить</button>
+        <div class="srv-dashboard">
+          <header class="srv-dash-intro">
+            <h2 class="srv-dash-h2">Пользователи</h2>
+          </header>
+
+          <div class="srv-dash-card srv-dash-card--wide">
+            <div class="srv-dash-card-head">Поиск и добавление</div>
+            <div class="srv-dash-card-body srv-dash-card-body--block">
+              <div class="toolbar">
+                <span class="mono" id="users-online-summary" style="font-size:0.82rem;padding:6px 0;">Онлайн: —</span>
+                <input type="search" class="inp" id="user-search" placeholder="Поиск по telegram_id…" />
+                <button type="button" class="btn btn-primary" id="btn-add-user">Добавить</button>
+              </div>
+            </div>
+          </div>
+
+          <table class="data">
+            <thead>
+              <tr>
+                <th>telegram_id</th>
+                <th>Трафик</th>
+                <th>Истекает</th>
+                <th>IP лимит</th>
+                <th>Статус</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbl-users"></tbody>
+          </table>
         </div>
-        <table class="data">
-          <thead>
-            <tr>
-              <th>telegram_id</th>
-              <th>Трафик</th>
-              <th>Истекает</th>
-              <th>IP лимит</th>
-              <th>Статус</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="tbl-users"></tbody>
-        </table>
       </section>
 
       <section id="sec-config" class="hidden">
-        <h2 class="section-title">Конфигурация</h2>
-        <span class="config-badge">Только просмотр</span>
-        <pre class="config-pre mono"><code id="cfg-yaml" class="language-yaml"></code></pre>
+        <div class="srv-dashboard">
+          <header class="srv-dash-intro">
+            <h2 class="srv-dash-h2">Конфигурация</h2>
+          </header>
+          <span class="config-badge">Только просмотр</span>
+          <div class="srv-dash-card srv-dash-card--wide">
+            <div class="srv-dash-card-head">Hysteria — YAML</div>
+            <div class="srv-dash-card-body srv-dash-card-body--block" style="padding:0;">
+              <pre class="config-pre mono"><code id="cfg-yaml" class="language-yaml"></code></pre>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section id="sec-server" class="hidden">
-        <h2 class="section-title">Сервер</h2>
-        <div class="grid-metrics" style="margin-bottom:22px;">
-          <div class="metric"><label>CPU</label><div class="val mono" id="srv-cpu">—</div><div class="progress"><i id="srv-cpu-bar" style="width:0%"></i></div></div>
-          <div class="metric"><label>RAM</label><div class="val mono" id="srv-ram">—</div><div class="progress"><i id="srv-ram-bar" style="width:0%"></i></div></div>
-          <div class="metric"><label>Диск /</label><div class="val mono" id="srv-disk">—</div><div class="progress"><i id="srv-disk-bar" style="width:0%"></i></div></div>
+        <div class="srv-dashboard">
+          <header class="srv-dash-intro">
+            <h2 class="srv-dash-h2">Сервер</h2>
+          </header>
+
+          <div class="srv-dash-card srv-dash-hero">
+            <div class="srv-dash-card-head">Загрузка ресурсов</div>
+            <div class="srv-dash-card-body srv-dash-card-body--block" style="padding:18px 14px 22px;">
+              <div class="srv-gauges">
+                <div class="srv-gauge srv-gauge-tint-neutral">
+                  <div class="srv-g-chart">
+                    <svg class="srv-g-svg" viewBox="0 9 100 82" aria-hidden="true">
+                      <path class="srv-g-track" pathLength="100" d="M 24.544 83.456 A 36 36 0 0 1 50 22 A 36 36 0 0 1 75.456 83.456" />
+                      <path class="srv-g-fill" id="srv-ring-cpu" pathLength="100" d="M 24.544 83.456 A 36 36 0 0 1 50 22 A 36 36 0 0 1 75.456 83.456" style="--pct:0" />
+                    </svg>
+                    <span class="srv-g-pct mono" id="srv-val-cpu">—</span>
+                  </div>
+                  <div class="srv-gauge-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="8" y="8" width="8" height="8" rx="1.3"/><path d="M9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m-3 6h3m12-6h3m-3 6h3"/></svg>
+                    ЦП
+                  </div>
+                  <div class="srv-gauge-sub mono" id="srv-sub-cpu"></div>
+                </div>
+                <div class="srv-gauge srv-gauge-tint-neutral">
+                  <div class="srv-g-chart">
+                    <svg class="srv-g-svg" viewBox="0 9 100 82" aria-hidden="true">
+                      <path class="srv-g-track" pathLength="100" d="M 24.544 83.456 A 36 36 0 0 1 50 22 A 36 36 0 0 1 75.456 83.456" />
+                      <path class="srv-g-fill" id="srv-ring-mem" pathLength="100" d="M 24.544 83.456 A 36 36 0 0 1 50 22 A 36 36 0 0 1 75.456 83.456" style="--pct:0" />
+                    </svg>
+                    <span class="srv-g-pct mono" id="srv-val-mem">—</span>
+                  </div>
+                  <div class="srv-gauge-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 7a2 2 0 012-2h12a2 2 0 012 2v10H4V7z"/><path d="M8 21h8M12 17v4"/></svg>
+                    ОЗУ
+                  </div>
+                  <div class="srv-gauge-sub mono" id="srv-sub-mem"></div>
+                </div>
+                <div class="srv-gauge srv-gauge-tint-neutral">
+                  <div class="srv-g-chart">
+                    <svg class="srv-g-svg" viewBox="0 9 100 82" aria-hidden="true">
+                      <path class="srv-g-track" pathLength="100" d="M 24.544 83.456 A 36 36 0 0 1 50 22 A 36 36 0 0 1 75.456 83.456" />
+                      <path class="srv-g-fill" id="srv-ring-swap" pathLength="100" d="M 24.544 83.456 A 36 36 0 0 1 50 22 A 36 36 0 0 1 75.456 83.456" style="--pct:0" />
+                    </svg>
+                    <span class="srv-g-pct mono" id="srv-val-swap">—</span>
+                  </div>
+                  <div class="srv-gauge-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M7 16l-4-4 4-4M17 8l4 4-4 4M13 5l-2 14"/></svg>
+                    Подкачка
+                  </div>
+                  <div class="srv-gauge-sub mono" id="srv-sub-swap"></div>
+                </div>
+                <div class="srv-gauge srv-gauge-tint-neutral">
+                  <div class="srv-g-chart">
+                    <svg class="srv-g-svg" viewBox="0 9 100 82" aria-hidden="true">
+                      <path class="srv-g-track" pathLength="100" d="M 24.544 83.456 A 36 36 0 0 1 50 22 A 36 36 0 0 1 75.456 83.456" />
+                      <path class="srv-g-fill" id="srv-ring-disk" pathLength="100" d="M 24.544 83.456 A 36 36 0 0 1 50 22 A 36 36 0 0 1 75.456 83.456" style="--pct:0" />
+                    </svg>
+                    <span class="srv-g-pct mono" id="srv-val-disk">—</span>
+                  </div>
+                  <div class="srv-gauge-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+                    Диск
+                  </div>
+                  <div class="srv-gauge-sub mono" id="srv-sub-disk"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h3 class="srv-mgmt-title">Управление сервисами</h3>
+          <table class="data">
+            <thead><tr><th>Сервис</th><th>Состояние</th><th>Действия</th></tr></thead>
+            <tbody id="tbl-svc"></tbody>
+          </table>
+
+          <div class="srv-dash-grid">
+            <div class="srv-dash-card">
+              <div class="srv-dash-card-head">Hysteria 2</div>
+              <div class="srv-dash-card-body">
+                <span class="pill mono" id="srv-pill-hy-st">—</span>
+                <span class="pill pill-muted mono" id="srv-pill-hy-ver">—</span>
+              </div>
+            </div>
+            <div class="srv-dash-card">
+              <div class="srv-dash-card-head">HY2 Agent</div>
+              <div class="srv-dash-card-body">
+                <span class="pill mono" id="srv-pill-agent-st">—</span>
+              </div>
+            </div>
+            <div class="srv-dash-card">
+              <div class="srv-dash-card-head">Время работы</div>
+              <div class="srv-dash-card-body">
+                <span class="pill pill-ok mono" id="srv-pill-uptime-os">ОС: —</span>
+              </div>
+            </div>
+            <div class="srv-dash-card">
+              <div class="srv-dash-card-head">Нагрузка на систему</div>
+              <div class="srv-dash-card-body">
+                <span class="pill pill-ok mono" id="srv-pill-load">—</span>
+              </div>
+            </div>
+
+            <div class="srv-dash-card srv-dash-card--wide">
+              <div class="srv-dash-card-head">Скорость передачи (сеть)</div>
+              <div class="srv-dash-card-body srv-dash-card-body--block">
+                <p class="srv-dash-lead" style="margin-bottom:14px;font-size:0.8rem;">По сравнению с предыдущим опросом панели; первый запрос может показать 0.</p>
+                <div class="srv-traffic-split">
+                  <div class="srv-traffic-item">
+                    <span class="srv-traffic-lab">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                      Отправка
+                    </span>
+                    <span class="srv-traffic-val mono" id="srv-net-up">—</span>
+                  </div>
+                  <div class="srv-traffic-item">
+                    <span class="srv-traffic-lab">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                      Загрузка
+                    </span>
+                    <span class="srv-traffic-val mono" id="srv-net-down">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="srv-dash-card srv-dash-card--wide">
+              <div class="srv-dash-card-head">Объём трафика (с момента загрузки ОС)</div>
+              <div class="srv-dash-card-body srv-dash-card-body--block">
+                <p class="srv-dash-lead" style="margin:0 0 14px;font-size:0.78rem;">Счётчики сети ОС (все интерфейсы), не только HY2. Для накопленного трафика по клиентам см. обзор «Всего трафика» и столбцы пользователей — данные из stats API Hysteria.</p>
+                <div class="srv-traffic-split">
+                  <div class="srv-traffic-item">
+                    <span class="srv-traffic-lab">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M7 18a4 4 0 004 4h4a5 5 0 005-5v-6M7 18H5a2 2 0 01-2-2V8a2 2 0 012-2h2M7 18V8m0 0h10m0 0v2a2 2 0 01-2 2h-2"/></svg>
+                      Отправлено
+                    </span>
+                    <span class="srv-traffic-val mono" id="srv-net-tot-up">—</span>
+                  </div>
+                  <div class="srv-traffic-item">
+                    <span class="srv-traffic-lab">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M7 13a4 4 0 004 4h4a5 5 0 005-5V6M7 13H5a2 2 0 01-2-2V5a2 2 0 012-2h2M7 13V5m0 0h10m0 0v2a2 2 0 01-2 2h-2"/></svg>
+                      Получено
+                    </span>
+                    <span class="srv-traffic-val mono" id="srv-net-tot-down">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="srv-dash-card srv-dash-card--wide">
+              <div class="srv-dash-card-head">Домен для клиентов</div>
+              <div class="srv-dash-card-body">
+                <div class="srv-domain-row">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 000 20 15 15 0 000-20"/></svg>
+                  <span class="srv-domain-val mono" id="srv-domain-val">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <table class="data">
-          <thead><tr><th>Сервис</th><th>Состояние</th><th>Действия</th></tr></thead>
-          <tbody id="tbl-svc"></tbody>
-        </table>
       </section>
     </main>
+    </div>
   </div>
+
+  <div class="sidebar-overlay hidden" id="sidebar-overlay" aria-hidden="true"></div>
 
   <div id="modal-user" class="modal-backdrop hidden">
     <div class="modal">
@@ -910,7 +2602,7 @@
       <div class="field"><label>Пароль клиента</label><input class="inp mono" id="mu-pw" type="text" autocomplete="off" /></div>
       <div class="field"><label>Лимит ГБ (инфо)</label><input class="inp" id="mu-gb" type="text" placeholder="—" disabled /></div>
       <div class="field"><label>Дней (инфо)</label><input class="inp" id="mu-days" type="text" placeholder="—" disabled /></div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+      <div class="modal-footer">
         <button type="button" class="btn btn-ghost" id="mu-cancel">Отмена</button>
         <button type="button" class="btn btn-primary" id="mu-save">Создать</button>
       </div>
@@ -919,29 +2611,29 @@
 
   <div id="modal-uri" class="modal-backdrop hidden">
     <div class="modal" style="max-width:min(560px,100%)">
-      <h3>Ссылка для клиента</h3>
+      <h3>Подключение для клиента</h3>
       <p class="lead" style="font-size:0.85rem;color:var(--amber);margin:0 0 12px;line-height:1.5;border-left:3px solid var(--amber);padding-left:10px;">
-        Чтобы в HAPP появились название группы, шкала трафика и дата — добавьте <strong>подписку по ссылке ниже</strong> (не копируйте одну строку <span class="mono">hysteria2://</span>).
-        Старую подписку в HAPP удалите → «+» → вставьте URL → обновите подписку.
+        Две ссылки: <strong>1)</strong> HTTPS-подписка (лучше для HAPP — трафик и название) и <strong>2)</strong> одна строка <span class="mono">hysteria2://</span> для ручного импорта (QUIC).
+        Для подписки в HAPP: удалите старую → «+» → вставьте HTTPS URL → обновить.
       </p>
       <div id="uri-sub-block" class="hidden">
-        <label class="field" style="display:block;margin-bottom:8px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">Ссылка подписки для HAPP (главное)</span>
+        <label class="field" style="display:block;margin-bottom:8px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">1. Подписка по HTTPS (Apache → агент)</span>
           <textarea id="uri-sub-out" class="inp mono" readonly rows="2" style="width:100%;resize:vertical;min-height:56px;font-size:0.76rem;"></textarea>
         </label>
         <p id="uri-sub-hint" class="lead" style="font-size:0.78rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
-          Ссылка подписки должна начинаться с <span class="mono">https://</span> (Apache + Let’s Encrypt на ноде). Если не открывается — проверьте <span class="mono">public_base_url</span> в config.json агента и что в Safari отдаётся текст с <span class="mono">#profile-title</span>.
+          Должна начинаться с <span class="mono">https://</span> того же хоста, что и панель. Если не открывается — проверьте <span class="mono">public_base_url</span> в config.json агента и прокси Apache (см. обзор: «Домен для ссылок HY2»).
         </p>
       </div>
       <p id="uri-no-sub" class="lead hidden" style="font-size:0.8rem;color:var(--amber);margin:0 0 12px;line-height:1.45;">
-        Нет ключа подписки: проверьте <span class="mono">jwt_secret</span> в config агента.
+        Нет ключа подписки: задайте <span class="mono">jwt_secret</span> (длиной ≥ 8) в config.json агента — тогда появится HTTPS-ссылка.
       </p>
-      <label class="field" style="display:block;margin-bottom:10px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">Одна строка hysteria2 (ручной импорт, без «красивой» карточки)</span>
+      <label class="field" style="display:block;margin-bottom:10px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">2. Строка Hysteria 2 (QUIC / UDP)</span>
         <textarea id="uri-out" class="inp mono" readonly rows="3" style="width:100%;resize:vertical;min-height:72px;font-size:0.78rem;"></textarea>
       </label>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
+      <div class="modal-footer">
         <button type="button" class="btn btn-ghost" id="uri-close">Закрыть</button>
-        <button type="button" class="btn btn-primary hidden" id="uri-copy-sub">Копировать ссылку подписки</button>
-        <button type="button" class="btn btn-ghost" id="uri-copy">Копировать строку</button>
+        <button type="button" class="btn btn-primary hidden" id="uri-copy-sub">Копировать HTTPS подписку</button>
+        <button type="button" class="btn btn-ghost" id="uri-copy">Копировать hysteria2://</button>
       </div>
     </div>
   </div>
@@ -954,7 +2646,8 @@
 (function () {
   const JWT_KEY = 'hy2_jwt';
   const THEME_KEY = 'hy2_theme';
-  const TRAFFIC_HIST_KEY = 'hy2_traffic_daily_v1';
+  /** Снимки накопительного total из /traffic по календарным дням; столбцы = прирост между днями. */
+  const TRAFFIC_HIST_KEY = 'hy2_traffic_daily_v2';
   const AUTO_REFRESH_KEY = 'hy2_auto_refresh';
   const AUTO_INTERVAL_KEY = 'hy2_refresh_interval_sec';
   const THEMES = ['tg-dark', 'crm-soft', 'light', 'accent-violet'];
@@ -974,7 +2667,8 @@
 
   async function api(path, opts = {}) {
     const jwt = localStorage.getItem(JWT_KEY);
-    const headers = Object.assign({ Authorization: 'Bearer ' + jwt }, opts.headers || {});
+    const headers = Object.assign({}, opts.headers || {});
+    if (jwt) headers.Authorization = 'Bearer ' + jwt;
     if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData) && !headers['Content-Type']) {
       headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(opts.body);
@@ -983,6 +2677,12 @@
     const ct = r.headers.get('content-type') || '';
     const data = ct.includes('json') ? await r.json().catch(() => ({})) : await r.text();
     if (!r.ok) {
+      const authPath = path.startsWith('/auth/');
+      if ((r.status === 401 || r.status === 403) && jwt && !authPath) {
+        localStorage.removeItem(JWT_KEY);
+        showApp(false);
+        throw new Error('Сессия истекла или токен недействителен — войдите снова');
+      }
       const d = typeof data === 'object' && data.detail !== undefined ? data.detail : data;
       throw new Error(typeof d === 'string' ? d : JSON.stringify(d));
     }
@@ -998,6 +2698,30 @@
     return (i === 0 ? v : v.toFixed(i >= 3 ? 2 : 1)) + ' ' + u[i];
   }
 
+  function formatBitrate(bps) {
+    if (bps == null || !Number.isFinite(Number(bps))) return '—';
+    const u = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+    let v = Number(bps);
+    let i = 0;
+    while (v >= 1024 && i < u.length - 1) {
+      v /= 1024;
+      i++;
+    }
+    const d = i === 0 ? 0 : v < 10 ? 2 : 1;
+    return v.toFixed(d) + ' ' + u[i];
+  }
+
+  function formatThreadCountRu(n) {
+    const x = Math.floor(Number(n));
+    if (!Number.isFinite(x) || x < 0) return '—';
+    const m10 = x % 10;
+    const m100 = x % 100;
+    let w = 'потоков';
+    if (m10 === 1 && m100 !== 11) w = 'поток';
+    else if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 > 20)) w = 'потока';
+    return x + ' ' + w;
+  }
+
   function formatUptime(sec) {
     const s = Number(sec) || 0;
     const d = Math.floor(s / 86400);
@@ -1008,20 +2732,27 @@
     return m + 'м';
   }
 
+  /** Сумма tx+rx по пользователям из stats; без двойного учёта при вложенном JSON. */
   function sumTrafficStats(obj) {
+    const t = normalizeTrafficPayload(obj);
+    if (!t || typeof t !== 'object' || Array.isArray(t)) return { up: 0, down: 0, total: 0 };
     let up = 0, down = 0;
-    function walk(x) {
-      if (!x || typeof x !== 'object') return;
-      if (Array.isArray(x)) { x.forEach(walk); return; }
-      if (typeof x.upload === 'number') up += x.upload;
-      if (typeof x.download === 'number') down += x.download;
-      if (typeof x.tx === 'number') up += x.tx;
-      if (typeof x.rx === 'number') down += x.rx;
-      Object.values(x).forEach((v) => {
-        if (v && typeof v === 'object' && !Array.isArray(v)) walk(v);
-      });
+    function addPair(v) {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) return;
+      up += Number(v.tx != null ? v.tx : v.upload) || 0;
+      down += Number(v.rx != null ? v.rx : v.download) || 0;
     }
-    walk(obj);
+    if (t.users && typeof t.users === 'object' && !Array.isArray(t.users)) {
+      Object.values(t.users).forEach(addPair);
+      return { up, down, total: up + down };
+    }
+    const skip = new Set(['online', 'data', 'users', 'meta', 'server', 'system', 'version']);
+    for (const [k, v] of Object.entries(t)) {
+      if (skip.has(k)) continue;
+      if (v && typeof v === 'object' && !Array.isArray(v)) addPair(v);
+    }
+    if (up > 0 || down > 0) return { up, down, total: up + down };
+    if (Array.isArray(t.online)) t.online.forEach(addPair);
     return { up, down, total: up + down };
   }
 
@@ -1076,44 +2807,30 @@
     touchLastRefresh._t = setTimeout(() => el.classList.remove('flash'), 450);
   }
 
+  /** tx/rx по каждому telegram_id из stats; один раз с users или с корня, без рекурсивного дубля. */
   function perUserFromTraffic(traffic, userIds) {
     const map = {};
     userIds.forEach((id) => {
       map[String(id)] = { up: 0, down: 0 };
     });
-
-    function absorb(obj, prefix) {
-      if (!obj || typeof obj !== 'object') return;
-      if (Array.isArray(obj)) {
-        obj.forEach((row) => absorb(row, prefix));
-        return;
-      }
-      const keys = Object.keys(obj);
-      keys.forEach((k) => {
-        const v = obj[k];
-        const km = map[k] !== undefined ? k : map[String(k)] !== undefined ? String(k) : null;
-        if (km !== null && v && typeof v === 'object') {
-          if (typeof v.upload === 'number') map[km].up += v.upload;
-          if (typeof v.download === 'number') map[km].down += v.download;
-          if (typeof v.tx === 'number') map[km].up += v.tx;
-          if (typeof v.rx === 'number') map[km].down += v.rx;
-        }
-        if (v && typeof v === 'object') absorb(v, k);
-      });
+    const t = normalizeTrafficPayload(traffic);
+    if (!t || typeof t !== 'object') return map;
+    function readUser(ks, v) {
+      if (!map[ks] || !v || typeof v !== 'object' || Array.isArray(v)) return;
+      map[ks].up += Number(v.tx != null ? v.tx : v.upload) || 0;
+      map[ks].down += Number(v.rx != null ? v.rx : v.download) || 0;
     }
-    absorb(traffic, '');
-    if (traffic && traffic.users && typeof traffic.users === 'object') {
-      Object.entries(traffic.users).forEach(([k, v]) => {
-        const ks = String(k);
-        if (!map[ks]) map[ks] = { up: 0, down: 0 };
-        if (v && typeof v === 'object') {
-          if (typeof v.upload === 'number') map[ks].up += v.upload;
-          if (typeof v.download === 'number') map[ks].down += v.download;
-          if (typeof v.tx === 'number') map[ks].up += v.tx;
-          if (typeof v.rx === 'number') map[ks].down += v.rx;
-        }
+    if (t.users && typeof t.users === 'object' && !Array.isArray(t.users)) {
+      userIds.forEach((id) => {
+        const ks = String(id);
+        readUser(ks, t.users[ks] ?? t.users[id]);
       });
+      return map;
     }
+    userIds.forEach((id) => {
+      const ks = String(id);
+      readUser(ks, t[ks] ?? t[id]);
+    });
     return map;
   }
 
@@ -1151,53 +2868,135 @@
     return rows;
   }
 
-  function loadTrafficHistory() {
+  function loadTrafficDayRows() {
     try {
-      return JSON.parse(localStorage.getItem(TRAFFIC_HIST_KEY) || '[]');
-    } catch (e) {
-      return [];
-    }
+      const x = JSON.parse(localStorage.getItem(TRAFFIC_HIST_KEY) || '{}');
+      if (x && Array.isArray(x.days)) return x.days;
+    } catch (e) {}
+    return [];
   }
 
-  function saveTrafficHistory(arr) {
-    localStorage.setItem(TRAFFIC_HIST_KEY, JSON.stringify(arr.slice(-14)));
+  function saveTrafficDayRows(rows) {
+    localStorage.setItem(TRAFFIC_HIST_KEY, JSON.stringify({ days: rows.slice(-45) }));
+  }
+
+  function localDateKey(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
   }
 
   function todayStr() {
-    return new Date().toISOString().slice(0, 10);
+    return localDateKey(new Date());
   }
 
-  function pushDailyTotal(bytes) {
-    const hist = loadTrafficHistory();
-    const t = todayStr();
-    const last = hist[hist.length - 1];
-    if (last && last.d === t) last.bytes = Math.max(last.bytes || 0, bytes);
-    else hist.push({ d: t, bytes });
-    saveTrafficHistory(hist);
+  function prevCalendarDayKey(dayKey) {
+    const p = dayKey.split('-').map((n) => parseInt(n, 10));
+    if (p.length !== 3 || p.some((x) => !Number.isFinite(x))) return '';
+    const dt = new Date(p[0], p[1] - 1, p[2]);
+    dt.setDate(dt.getDate() - 1);
+    return localDateKey(dt);
   }
+
+  /** Сохранить максимальный накопительный total за день + первый замер дня (если нет «вчера» в истории). */
+  function pushDailyTrafficSample(cumulativeTotal) {
+    const c = Math.max(0, Number(cumulativeTotal) || 0);
+    const t = todayStr();
+    const rows = loadTrafficDayRows();
+    let row = rows.find((r) => r.d === t);
+    if (!row) {
+      row = { d: t, cum: c, first: c };
+      rows.push(row);
+    } else {
+      row.cum = Math.max(row.cum || 0, c);
+      if (typeof row.first !== 'number' || !Number.isFinite(row.first)) row.first = c;
+      else row.first = Math.min(row.first, c);
+    }
+    rows.sort((a, b) => a.d.localeCompare(b.d));
+    saveTrafficDayRows(rows);
+  }
+
+  function rowMapByDay(rows) {
+    const m = {};
+    rows.forEach((r) => {
+      if (r && r.d) m[r.d] = r;
+    });
+    return m;
+  }
+
+  /** Байты за календарный день: cum(день) − cum(вчера); если вчера нет — cum − first замер этого дня. */
+  function dailyTrafficDeltaBytes(dayKey, rows) {
+    const map = rowMapByDay(rows);
+    const row = map[dayKey];
+    if (!row || typeof row.cum !== 'number') return 0;
+    const prevK = prevCalendarDayKey(dayKey);
+    const prev = prevK && map[prevK];
+    if (prev && typeof prev.cum === 'number') {
+      return Math.max(0, row.cum - prev.cum);
+    }
+    const first = typeof row.first === 'number' ? row.first : row.cum;
+    return Math.max(0, row.cum - first);
+  }
+
+  const OVERVIEW_CHART_DAYS = 30;
 
   function renderChart() {
-    const hist = loadTrafficHistory();
+    const rows = loadTrafficDayRows();
     const days = [];
-    for (let i = 6; i >= 0; i--) {
+    const dayObjs = [];
+    for (let i = OVERVIEW_CHART_DAYS - 1; i >= 0; i--) {
       const dt = new Date();
+      dt.setHours(12, 0, 0, 0);
       dt.setDate(dt.getDate() - i);
-      days.push(dt.toISOString().slice(0, 10));
+      days.push(localDateKey(dt));
+      dayObjs.push(dt);
     }
-    const byD = Object.fromEntries(hist.map((x) => [x.d, x.bytes || 0]));
-    const vals = days.map((d) => byD[d] || 0);
+    const vals = days.map((d) => dailyTrafficDeltaBytes(d, rows));
     const max = Math.max(...vals, 1);
+    const BAR_PX = 136;
     const root = $('#chart-bars');
+    if (!root) return;
     root.innerHTML = '';
+    const wd = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     days.forEach((d, i) => {
       const col = document.createElement('div');
       col.className = 'bar-col';
+      const stack = document.createElement('div');
+      stack.className = 'bar-stack';
       const bar = document.createElement('div');
-      bar.className = 'bar';
-      bar.style.height = Math.round((vals[i] / max) * 120) + 'px';
+      bar.className = 'bar' + (vals[i] > 0 ? '' : ' bar--empty');
+      const pct = vals[i] / max;
+      bar.style.height = Math.max(4, Math.round(pct * BAR_PX)) + 'px';
+      if (vals[i] > 0) {
+        const inner = document.createElement('span');
+        inner.className = 'bar-val-inside';
+        inner.textContent = formatBytes(vals[i]);
+        bar.appendChild(inner);
+      }
       const lab = document.createElement('span');
-      lab.textContent = d.slice(5);
-      col.appendChild(bar);
+      lab.className = 'bar-label bar-label--stacked';
+      const di = dayObjs[i];
+      const dd = String(di.getDate()).padStart(2, '0');
+      const mm = String(di.getMonth() + 1).padStart(2, '0');
+      lab.innerHTML =
+        '<span class="bar-label-wd">' +
+        wd[di.getDay()] +
+        '</span><span class="bar-label-dt">' +
+        dd +
+        '.' +
+        mm +
+        '</span>';
+      col.title =
+        wd[di.getDay()] +
+        ', ' +
+        d +
+        ' · ' +
+        (vals[i] > 0
+          ? formatBytes(vals[i]) + ' (прирост за сутки)'
+          : 'нет данных за день (нужны обновления обзора и соседний день в истории)');
+      stack.appendChild(bar);
+      col.appendChild(stack);
       col.appendChild(lab);
       root.appendChild(col);
     });
@@ -1251,9 +3050,67 @@
   function cleanHysteriaVersion(s) {
     if (!s) return '—';
     const lines = String(s).split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
-    const verLine = lines.find((l) => /^\s*Version:/i.test(l) || /v\d+\.\d+/i.test(l));
-    if (verLine) return verLine.replace(/^\s*Version:\s*/i, '').trim().slice(0, 80);
-    return lines[0].slice(0, 80);
+    if (!lines.length) return '—';
+    const bannerish = (ln) => {
+      if (ln.length < 10) return false;
+      let b = 0;
+      for (let i = 0; i < ln.length; i++) {
+        const c = ln.charCodeAt(i);
+        if ((c >= 0x2580 && c <= 0x259f) || ln[i] === '█' || ln[i] === '░' || ln[i] === '▒' || ln[i] === '▓') b++;
+      }
+      return b >= Math.max(8, ln.length / 4);
+    };
+    const verRe = /v?\d+\.\d+(?:\.\d+)?(?:-[a-z0-9.-]+)?(?:\+[a-z0-9.-]+)?/i;
+    for (const ln of lines) {
+      const vm = ln.match(/^\s*Version:\s*(.+)$/i);
+      if (vm) {
+        const t = vm[1].trim();
+        const m2 = t.match(verRe);
+        return (m2 ? m2[0] : t).slice(0, 80);
+      }
+    }
+    const nonBanner = lines.filter((ln) => !bannerish(ln));
+    const pool = nonBanner.length ? nonBanner : lines;
+    for (const ln of pool) {
+      const m2 = ln.match(verRe);
+      if (m2 && ln.length < 100) return m2[0].slice(0, 80);
+    }
+    for (const ln of pool) {
+      const m2 = ln.match(verRe);
+      if (m2) return m2[0].slice(0, 80);
+    }
+    const first = pool.find((ln) => !bannerish(ln)) || pool[0];
+    return first.slice(0, 80);
+  }
+
+  const METRIC_TINTS = ['metric-tint-neutral', 'metric-tint-low', 'metric-tint-mid', 'metric-tint-high', 'metric-tint-crit'];
+  /** Пороги для CPU / ОЗУ / свап (%): раньше краснеет — критично с 80 %. */
+  const TINT_CRIT_MIN = 80;
+  const TINT_HIGH_MIN = 55;
+  const TINT_MID_MIN = 30;
+  /** Сколько подключений HY2 считать «100 %» шкалы для карточки онлайн (те же пороги через tintClassFromLoadPct). */
+  const ONLINE_CONN_FOR_FULL_SCALE = 30;
+  function resetOverviewMetricTints() {
+    document.querySelectorAll('.overview-summary .metric:not(.hidden)').forEach((card) => {
+      METRIC_TINTS.forEach((c) => card.classList.remove(c));
+      card.classList.add('metric-tint-neutral');
+    });
+  }
+  function tintClassFromLoadPct(pct) {
+    if (pct == null || !Number.isFinite(Number(pct))) return 'metric-tint-neutral';
+    const p = Math.max(0, Math.min(100, Number(pct)));
+    if (p >= TINT_CRIT_MIN) return 'metric-tint-crit';
+    if (p >= TINT_HIGH_MIN) return 'metric-tint-high';
+    if (p >= TINT_MID_MIN) return 'metric-tint-mid';
+    return 'metric-tint-low';
+  }
+  function applyMetricTint(elementId, tintClass) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const card = el.closest('.metric');
+    if (!card) return;
+    METRIC_TINTS.forEach((c) => card.classList.remove(c));
+    card.classList.add(tintClass);
   }
 
   async function loadOverview(silent) {
@@ -1293,6 +3150,12 @@
           pu.textContent = '—';
         }
       }
+      const ph = $('#m-hy2-domain');
+      if (ph) {
+        const d = String(st.hysteria_client_domain || '').trim();
+        ph.textContent = d || '— (задайте public_base_url или hysteria_public_domain в config.json агента)';
+        ph.style.color = d ? 'inherit' : 'var(--amber)';
+      }
 
       $('#m-users').textContent = String(ids.length);
       const mo = $('#m-online');
@@ -1306,8 +3169,58 @@
       }
       const sum = sumTrafficStats(traffic);
       $('#m-traffic').textContent = formatBytes(sum.total);
+      const cpu = st.cpu_percent != null && Number.isFinite(Number(st.cpu_percent)) ? Math.round(Number(st.cpu_percent)) : null;
+      const ncpu = st.cpu_count != null && Number.isFinite(Number(st.cpu_count)) ? Math.floor(Number(st.cpu_count)) : 0;
+      const vm = st.memory || {};
+      const memPct = vm.percent != null && Number.isFinite(Number(vm.percent)) ? Math.round(Number(vm.percent)) : null;
+      const sw = st.swap || {};
+      const swTot = Number(sw.total) || 0;
+      const swUsed = Number(sw.used) || 0;
+      const swPct = sw.percent != null && Number.isFinite(Number(sw.percent)) ? Math.round(Number(sw.percent)) : null;
+
+      const mCpu = $('#m-cpu');
+      const mCpuSub = $('#m-cpu-sub');
+      if (mCpu) {
+        mCpu.textContent = cpu != null ? cpu + '%' : '—';
+        if (mCpuSub) mCpuSub.textContent = ncpu > 0 ? ncpu + ' лог. ядер' : 'загрузка';
+      }
+      const mMem = $('#m-mem');
+      const mMemSub = $('#m-mem-sub');
+      if (mMem) {
+        mMem.textContent = memPct != null ? memPct + '%' : '—';
+        if (mMemSub) {
+          if (vm.used != null && vm.total != null) {
+            mMemSub.textContent = formatBytes(vm.used) + ' / ' + formatBytes(vm.total);
+          } else {
+            mMemSub.textContent = 'занято';
+          }
+        }
+      }
+      const mSw = $('#m-swap');
+      const mSwSub = $('#m-swap-sub');
+      if (mSw) {
+        if (swTot <= 0) {
+          mSw.textContent = '—';
+          if (mSwSub) mSwSub.textContent = 'не настроен';
+        } else {
+          mSw.textContent = swPct != null ? swPct + '%' : '—';
+          if (mSwSub) mSwSub.textContent = formatBytes(swUsed) + ' / ' + formatBytes(swTot);
+        }
+      }
+      resetOverviewMetricTints();
+      applyMetricTint('m-cpu', tintClassFromLoadPct(cpu));
+      applyMetricTint('m-mem', tintClassFromLoadPct(memPct));
+      if (swTot <= 0) applyMetricTint('m-swap', 'metric-tint-neutral');
+      else applyMetricTint('m-swap', tintClassFromLoadPct(swPct));
+      let onlineTint;
+      if (!hyOk) onlineTint = 'metric-tint-crit';
+      else {
+        const onlinePct = Math.min(100, ((onl.connCount || 0) / ONLINE_CONN_FOR_FULL_SCALE) * 100);
+        onlineTint = tintClassFromLoadPct(onlinePct);
+      }
+      applyMetricTint('m-online', onlineTint);
       $('#m-uptime').textContent = formatUptime(st.uptime_seconds);
-      pushDailyTotal(sum.total);
+      pushDailyTrafficSample(sum.total);
       renderChart();
 
       const tb = $('#tbl-conn');
@@ -1399,10 +3312,12 @@
               const subBlock = $('#uri-sub-block');
               const noSub = $('#uri-no-sub');
               const btnSub = $('#uri-copy-sub');
+              const subHint = $('#uri-sub-hint');
               if (subBlock) subBlock.classList.toggle('hidden', !sub);
               if (noSub) noSub.classList.toggle('hidden', !!sub);
               if ($('#uri-sub-out')) $('#uri-sub-out').value = sub;
               if (btnSub) btnSub.classList.toggle('hidden', !sub);
+              if (subHint && r.happ_subscription_hint) subHint.textContent = r.happ_subscription_hint;
               $('#modal-uri').classList.remove('hidden');
             } catch (e) {
               toast(String(e.message || e), true);
@@ -1428,17 +3343,131 @@
     }
   }
 
+  function setSrvGauge(ringSel, valSel, subSel, pct, valText, subText) {
+    const ring = $(ringSel);
+    if (ring) ring.style.setProperty('--pct', String(Math.min(100, Math.max(0, Number(pct) || 0))));
+    const v = $(valSel);
+    if (v) v.textContent = valText;
+    const s = $(subSel);
+    if (s) s.textContent = subText;
+  }
+
+  const SRV_GAUGE_TINTS = ['srv-gauge-tint-neutral', 'srv-gauge-tint-low', 'srv-gauge-tint-mid', 'srv-gauge-tint-high', 'srv-gauge-tint-crit'];
+  function applySrvGaugeTint(ringSel, pct) {
+    const ring = $(ringSel);
+    if (!ring) return;
+    const host = ring.closest('.srv-gauge');
+    if (!host) return;
+    SRV_GAUGE_TINTS.forEach((c) => host.classList.remove(c));
+    if (pct == null || !Number.isFinite(Number(pct))) {
+      host.classList.add('srv-gauge-tint-neutral');
+      return;
+    }
+    const m = tintClassFromLoadPct(Number(pct));
+    host.classList.add(m.replace(/^metric-tint-/, 'srv-gauge-tint-'));
+  }
+
+  function setPillState(el, ok, okText, badText) {
+    if (!el) return;
+    el.textContent = ok ? okText : badText;
+    el.classList.remove('pill-ok', 'pill-bad');
+    el.classList.add(ok ? 'pill-ok' : 'pill-bad');
+  }
+
   async function loadServer(silent) {
     try {
       const st = await api('/status');
-      $('#srv-cpu').textContent = (st.cpu_percent != null ? st.cpu_percent.toFixed(0) : '—') + '%';
-      $('#srv-cpu-bar').style.width = Math.min(100, st.cpu_percent || 0) + '%';
+      const cpuP = Math.min(100, st.cpu_percent != null ? Number(st.cpu_percent) : 0);
+      setSrvGauge(
+        '#srv-ring-cpu',
+        '#srv-val-cpu',
+        '#srv-sub-cpu',
+        cpuP,
+        (st.cpu_percent != null ? Number(st.cpu_percent).toFixed(2) : '—') + '%',
+        formatThreadCountRu(st.cpu_count)
+      );
+      applySrvGaugeTint('#srv-ring-cpu', st.cpu_percent != null ? cpuP : null);
+
       const mem = st.memory || {};
-      $('#srv-ram').textContent = formatBytes(mem.used) + ' / ' + formatBytes(mem.total);
-      $('#srv-ram-bar').style.width = Math.min(100, mem.percent || 0) + '%';
+      const mp = Math.min(100, mem.percent != null ? mem.percent : 0);
+      setSrvGauge(
+        '#srv-ring-mem',
+        '#srv-val-mem',
+        '#srv-sub-mem',
+        mp,
+        (mem.percent != null ? Number(mem.percent).toFixed(2) : '—') + '%',
+        formatBytes(mem.used) + ' / ' + formatBytes(mem.total)
+      );
+      applySrvGaugeTint('#srv-ring-mem', mem.percent != null ? mp : null);
+
+      const sw = st.swap || {};
+      const swT = sw.total != null ? Number(sw.total) : 0;
+      if (swT <= 0) {
+        setSrvGauge('#srv-ring-swap', '#srv-val-swap', '#srv-sub-swap', 0, '—', 'Swap не используется');
+        applySrvGaugeTint('#srv-ring-swap', null);
+      } else {
+        const sp = Math.min(100, sw.percent != null ? Number(sw.percent) : 0);
+        setSrvGauge(
+          '#srv-ring-swap',
+          '#srv-val-swap',
+          '#srv-sub-swap',
+          sp,
+          (sw.percent != null ? Number(sw.percent).toFixed(2) : '—') + '%',
+          formatBytes(sw.used) + ' / ' + formatBytes(sw.total)
+        );
+        applySrvGaugeTint('#srv-ring-swap', sw.percent != null ? sp : null);
+      }
+
       const dk = st.disk || {};
-      $('#srv-disk').textContent = formatBytes(dk.used) + ' / ' + formatBytes(dk.total);
-      $('#srv-disk-bar').style.width = Math.min(100, dk.percent || 0) + '%';
+      const dp = Math.min(100, dk.percent != null ? dk.percent : 0);
+      setSrvGauge(
+        '#srv-ring-disk',
+        '#srv-val-disk',
+        '#srv-sub-disk',
+        dp,
+        (dk.percent != null ? Number(dk.percent).toFixed(2) : '—') + '%',
+        formatBytes(dk.used) + ' / ' + formatBytes(dk.total)
+      );
+      applySrvGaugeTint('#srv-ring-disk', dk.percent != null ? dp : null);
+
+      const hyOk = st.hysteria_active === 'active';
+      setPillState($('#srv-pill-hy-st'), hyOk, 'Запущен', String(st.hysteria_active || 'неизв.'));
+      const hv = $('#srv-pill-hy-ver');
+      if (hv) hv.textContent = cleanHysteriaVersion(st.hysteria_version);
+
+      const agOk = st.hy2_agent_active === 'active';
+      setPillState($('#srv-pill-agent-st'), agOk, 'Запущен', String(st.hy2_agent_active || 'неизв.'));
+
+      const upOs = $('#srv-pill-uptime-os');
+      if (upOs) upOs.textContent = 'ОС: ' + formatUptime(st.uptime_seconds);
+
+      const la = st.load_average;
+      const loadEl = $('#srv-pill-load');
+      if (loadEl) {
+        if (Array.isArray(la) && la.length >= 3) {
+          loadEl.textContent = la[0] + ' | ' + la[1] + ' | ' + la[2];
+          loadEl.classList.remove('pill-muted');
+          loadEl.classList.add('pill-ok');
+        } else {
+          loadEl.textContent = 'Недоступно (не Linux?)';
+          loadEl.classList.remove('pill-ok');
+          loadEl.classList.add('pill-muted');
+        }
+      }
+
+      const nUp = $('#srv-net-up');
+      if (nUp) nUp.textContent = formatBitrate(st.net_speed_up_bps);
+      const nDn = $('#srv-net-down');
+      if (nDn) nDn.textContent = formatBitrate(st.net_speed_down_bps);
+      const tUp = $('#srv-net-tot-up');
+      if (tUp) tUp.textContent = formatBytes(st.bytes_sent_total);
+      const tDn = $('#srv-net-tot-down');
+      if (tDn) tDn.textContent = formatBytes(st.bytes_recv_total);
+      const domEl = $('#srv-domain-val');
+      if (domEl) {
+        const d = (st.hysteria_client_domain || '').trim();
+        domEl.textContent = d || 'не определён (см. конфиг / TLS)';
+      }
 
       const tb = $('#tbl-svc');
       tb.innerHTML = '';
@@ -1492,9 +3521,14 @@
 
   function syncLoginThemeChips() {
     const cur = document.documentElement.getAttribute('data-theme') || 'tg-dark';
+    const name = THEME_LABELS[cur] || cur;
     const lbl = $('#login-theme-current-label');
-    if (lbl) lbl.textContent = THEME_LABELS[cur] || cur;
-    $$('#login-theme-chips [data-theme-set]').forEach((b) => {
+    if (lbl) lbl.textContent = name;
+    const appLbl = $('#app-theme-current-label');
+    if (appLbl) appLbl.textContent = name;
+    const btnTheme = $('#btn-theme');
+    if (btnTheme) btnTheme.setAttribute('title', 'Тема: ' + name);
+    $$('#login-theme-chips [data-theme-set], #app-theme-dd [data-theme-set]').forEach((b) => {
       b.classList.toggle('active', b.getAttribute('data-theme-set') === cur);
     });
   }
@@ -1508,10 +3542,36 @@
     if (wrap) wrap.classList.remove('open');
   }
 
+  function closeAppThemeMenu() {
+    const m = $('#app-theme-menu');
+    const tr = $('#btn-theme');
+    const wrap = $('#app-theme-dd');
+    if (m && !m.classList.contains('hidden')) m.classList.add('hidden');
+    if (tr) tr.setAttribute('aria-expanded', 'false');
+    if (wrap) wrap.classList.remove('open');
+  }
+
+  function closeAllThemeMenus() {
+    closeLoginThemeMenu();
+    closeAppThemeMenu();
+  }
+
   function toggleLoginThemeMenu() {
+    closeAppThemeMenu();
     const m = $('#login-theme-menu');
     const tr = $('#btn-login-theme');
     const wrap = document.querySelector('#login-theme-chips.login-theme-dd');
+    if (!m || !tr || !wrap) return;
+    const nowHidden = m.classList.toggle('hidden');
+    tr.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
+    wrap.classList.toggle('open', !nowHidden);
+  }
+
+  function toggleAppThemeMenu() {
+    closeLoginThemeMenu();
+    const m = $('#app-theme-menu');
+    const tr = $('#btn-theme');
+    const wrap = $('#app-theme-dd');
     if (!m || !tr || !wrap) return;
     const nowHidden = m.classList.toggle('hidden');
     tr.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
@@ -1529,17 +3589,30 @@
     }
   }
 
-  function cycleTheme() {
-    const cur = document.documentElement.getAttribute('data-theme') || 'tg-dark';
-    const i = THEMES.indexOf(cur);
-    const next = THEMES[(i + 1) % THEMES.length];
-    setTheme(next);
-    toast('Тема: ' + (THEME_LABELS[next] || next));
+  function setSidebarOpen(open) {
+    const sb = $('#sidebar');
+    const ov = $('#sidebar-overlay');
+    if (sb) sb.classList.toggle('open', !!open);
+    if (ov) ov.classList.toggle('hidden', !open);
   }
 
   function showApp(show) {
-    $('#view-login').classList.toggle('hidden', show);
-    $('#view-app').classList.toggle('hidden', !show);
+    const login = $('#view-login');
+    const app = $('#view-app');
+    if (show) {
+      login.classList.add('hidden');
+      app.classList.remove('hidden');
+      app.classList.remove('app-reveal');
+      void app.offsetWidth;
+      app.classList.add('app-reveal');
+      window.setTimeout(function () {
+        app.classList.remove('app-reveal');
+      }, 520);
+    } else {
+      app.classList.add('hidden');
+      login.classList.remove('hidden');
+      setSidebarOpen(false);
+    }
   }
 
   function logout() {
@@ -1571,7 +3644,10 @@
 
   $('#btn-logout').addEventListener('click', logout);
 
-  $('#btn-theme').addEventListener('click', cycleTheme);
+  $('#btn-theme').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleAppThemeMenu();
+  });
 
   $('#btn-login-theme').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1585,22 +3661,35 @@
     closeLoginThemeMenu();
   });
 
+  $('#app-theme-dd').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-theme-set]');
+    if (!b) return;
+    setTheme(b.getAttribute('data-theme-set'));
+    closeAppThemeMenu();
+  });
+
   document.addEventListener('click', () => {
-    closeLoginThemeMenu();
+    closeAllThemeMenus();
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeLoginThemeMenu();
+    if (e.key === 'Escape') closeAllThemeMenus();
   });
 
   $('#btn-menu').addEventListener('click', () => {
-    $('#sidebar').classList.toggle('open');
+    const sb = $('#sidebar');
+    const next = sb && !sb.classList.contains('open');
+    setSidebarOpen(next);
+  });
+
+  $('#sidebar-overlay').addEventListener('click', () => {
+    setSidebarOpen(false);
   });
 
   $$('.nav-btn').forEach((b) => {
     b.addEventListener('click', () => {
       showSection(b.dataset.section);
-      $('#sidebar').classList.remove('open');
+      setSidebarOpen(false);
     });
   });
 
@@ -1641,7 +3730,7 @@
     if (!t) return;
     try {
       await navigator.clipboard.writeText(t);
-      toast('Скопировано в буфер');
+      toast('Строка hysteria2 скопирована');
     } catch (e) {
       toast('Не удалось скопировать', true);
     }
@@ -1653,7 +3742,7 @@
       if (!t) return;
       try {
         await navigator.clipboard.writeText(t);
-        toast('Ссылка подписки скопирована');
+        toast('HTTPS-ссылка подписки скопирована');
       } catch (e) {
         toast('Не удалось скопировать', true);
       }
@@ -1694,6 +3783,31 @@
       });
     }
     if (btn) btn.addEventListener('click', () => loadCurrentSection());
+  })();
+
+  (function initRefreshPopover() {
+    const menu = $('#btn-refresh-menu');
+    const pop = $('#refresh-popover');
+    const wrap = $('#refresh-split-wrap');
+    if (!menu || !pop || !wrap) return;
+    menu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pop.classList.toggle('hidden');
+      menu.setAttribute('aria-expanded', String(!pop.classList.contains('hidden')));
+    });
+    pop.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', (e) => {
+      if (wrap.contains(e.target)) return;
+      if (!pop.classList.contains('hidden')) {
+        pop.classList.add('hidden');
+        menu.setAttribute('aria-expanded', 'false');
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || pop.classList.contains('hidden')) return;
+      pop.classList.add('hidden');
+      menu.setAttribute('aria-expanded', 'false');
+    });
   })();
 
   if (localStorage.getItem(JWT_KEY)) {
