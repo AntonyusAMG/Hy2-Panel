@@ -1226,19 +1226,26 @@
 
   (async function initSession() {
     const jwt = _getJwt();
-    const headers = {};
+    const headers = { Accept: 'application/json' };
     if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
     try {
       const r = await fetch(apiUrl('/auth/me'), { credentials: 'include', headers: headers });
-      if (!r.ok) {
+      if (r.status === 401) {
         _removeJwt();
         showApp(false);
+        return;
+      }
+      if (!r.ok) {
+        /* НЕ вызывать _removeJwt: 502/503/429 и т.д. — сессия жива, иначе «вылет» при каждом глюке прокси */
+        showApp(false);
+        toast('Сервер временно недоступен (' + r.status + '). Обновите страницу через минуту.', true);
         return;
       }
       showApp(true);
       showSection('overview');
     } catch (e) {
       showApp(false);
+      toast('Нет связи с панелью. Проверьте сеть и обновите страницу.', true);
     }
   })();
 })();
