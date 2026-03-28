@@ -83,10 +83,53 @@ def _hysteria_service() -> str:
     return str(_config.get("hysteria_service", "hysteria-server"))
 
 
-async def verify_bearer(authorization: str | None = Header(None)) -> dict[str, Any]:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=403, detail="Missing or invalid Authorization header")
-    raw = authorization[7:].strip()
+# Имя cookie совпадает с JWT_KEY в node-agent/ui/app.js
+_UI_JWT_COOKIE = "hy2_jwt"
+
+
+def _client_https(request: Request) -> bool:
+    """За Apache SSL терминатором смотрим X-Forwarded-Proto."""
+    xf = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    if xf == "https":
+        return True
+    return request.url.scheme == "https"
+
+
+def _raw_token_candidates(request: Request, authorization: str | None) -> list[str]:
+    """Сначала Bearer (часто из localStorage), затем cookie. Оба могут отличаться — пробуем по очереди."""
+    seen: set[str] = set()
+    out: list[str] = []
+    if authorization:
+        auth = authorization.strip()
+        if auth[:7].lower() == "bearer ":
+            t = auth[7:].strip()
+            if t and t not in seen:
+                seen.add(t)
+                out.append(t)
+    c = (request.cookies.get(_UI_JWT_COOKIE) or "").strip()
+    if c and c not in seen:
+        seen.add(c)
+        out.append(c)
+    return out
+
+
+def _verify_from_request(request: Request, authorization: str | None) -> dict[str, Any]:
+    candidates = _raw_token_candidates(request, authorization)
+    if not candidates:
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    last: HTTPException | None = None
+    for raw in candidates:
+        try:
+            return _auth_from_raw_token(raw)
+        except HTTPException as e:
+            if e.status_code == 401:
+                last = e
+                continue
+            raise
+    raise last if last else HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+def _auth_from_raw_token(raw: str) -> dict[str, Any]:
     token = _agent_token()
     if token and len(token) >= 32 and raw == token:
         return {"kind": "agent"}
@@ -94,10 +137,18 @@ async def verify_bearer(authorization: str | None = Header(None)) -> dict[str, A
         payload = jwt.decode(raw, _jwt_secret(), algorithms=["HS256"])
         return {"kind": "jwt", "sub": payload.get("sub")}
     except JWTError:
-        raise HTTPException(status_code=403, detail="Invalid token") from None
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from None
+
+
+async def verify_bearer(
+    request: Request,
+    authorization: str | None = Header(None),
+) -> dict[str, Any]:
+    return _verify_from_request(request, authorization)
 
 
 async def verify_sub_key_or_jwt(
+    request: Request,
     k: str | None = Query(None, description="happ_subscription_key из config.json"),
     authorization: str | None = Header(None),
 ) -> dict[str, Any]:
@@ -106,7 +157,7 @@ async def verify_sub_key_or_jwt(
     expected = _happ_subscription_key()
     if expected and kq == expected:
         return {"kind": "subkey"}
-    return await verify_bearer(authorization)
+    return _verify_from_request(request, authorization)
 
 
 class LoginBody(BaseModel):
@@ -479,10 +530,17 @@ async def status(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
         pass
     pb = str(_config.get("public_base_url") or "").strip().rstrip("/")
     resolved_domain = ""
+    hy_yaml = {}
     try:
-        resolved_domain = _hysteria_public_domain(_read_hysteria_yaml())
+        hy_yaml = _read_hysteria_yaml()
+        resolved_domain = _hysteria_public_domain(hy_yaml)
     except Exception:
         pass
+
+    masq = hy_yaml.get("masquerade", {})
+    acme = hy_yaml.get("acme", {})
+    tls = hy_yaml.get("tls", {})
+
     payload: dict[str, Any] = {
         "node_name": str(_config.get("node_name", "")),
         "panel_public_url": pb,
@@ -491,6 +549,13 @@ async def status(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
         "hysteria_active": hysteria_active,
         "hysteria_version": _hysteria_version_line(),
         "hy2_agent_active": hy2_agent_active,
+
+        "tls_active": bool(acme or tls),
+        "tls_mode": "Auto (ACME)" if acme else ("Manual" if tls else "None"),
+        "masquerade_enabled": bool(masq),
+        "masquerade_type": masq.get("type", "None") if masq else "None",
+        "stats_secret_configured": bool(_config.get("stats_secret")),
+
         "cpu_percent": psutil.cpu_percent(interval=None),
         "cpu_count": psutil.cpu_count(logical=True) or 0,
         "load_average": load_avg,
@@ -1108,8 +1173,29 @@ async def logs(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
     return {"lines": out.splitlines()}
 
 
+@app.get("/auth/me")
+async def auth_me(auth: dict[str, Any] = Depends(verify_bearer)) -> dict[str, Any]:
+    """Проверка сессии по Bearer или cookie (для F5 без чтения HttpOnly в JS)."""
+    sub = auth.get("sub") if auth.get("kind") == "jwt" else None
+    return {"ok": True, "kind": auth.get("kind"), "sub": sub}
+
+
+@app.post("/auth/logout")
+async def auth_logout(request: Request) -> JSONResponse:
+    r = JSONResponse(content={"ok": True})
+    # Параметры как у set_cookie — иначе браузер может не сбросить HttpOnly
+    r.delete_cookie(
+        _UI_JWT_COOKIE,
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=_client_https(request),
+    )
+    return r
+
+
 @app.post("/auth/login")
-async def login(body: LoginBody, request: Request) -> dict[str, Any]:
+async def login(body: LoginBody, request: Request) -> JSONResponse:
     ip = request.client.host if request.client else "unknown"
     now = time.time()
     async with _login_lock:
@@ -1142,7 +1228,19 @@ async def login(body: LoginBody, request: Request) -> dict[str, Any]:
         _jwt_secret(),
         algorithm="HS256",
     )
-    return {"access_token": token, "token_type": "bearer", "expires_in": 86400}
+    payload = {"access_token": token, "token_type": "bearer", "expires_in": 86400}
+    response = JSONResponse(content=payload)
+    # HttpOnly: переживает сбои localStorage; JS дублирует в localStorage для Authorization
+    response.set_cookie(
+        key=_UI_JWT_COOKIE,
+        value=token,
+        max_age=86400,
+        path="/",
+        httponly=True,
+        secure=_client_https(request),
+        samesite="lax",
+    )
+    return response
 
 
 @app.get("/")
@@ -1155,6 +1253,22 @@ async def root_landing(request: Request) -> HTMLResponse:
 @app.get("/ui/", include_in_schema=False)
 async def ui_entry() -> FileResponse:
     return _serve_ui_file()
+
+
+@app.get("/ui/style.css", include_in_schema=False)
+async def ui_css() -> FileResponse:
+    path = _ui_path.parent / "style.css"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="text/css")
+
+
+@app.get("/ui/app.js", include_in_schema=False)
+async def ui_js() -> FileResponse:
+    path = _ui_path.parent / "app.js"
+    if not path.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="application/javascript")
 
 
 @app.get("/healthz")
