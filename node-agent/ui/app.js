@@ -64,7 +64,8 @@
   }
 
   async function api(path, opts = {}) {
-    const jwt = _getJwt();
+    const jwtRaw = _getJwt();
+    const jwt = jwtRaw && String(jwtRaw).trim();
     const headers = Object.assign({}, opts.headers || {});
     if (jwt) headers.Authorization = 'Bearer ' + jwt;
     if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData) && !headers['Content-Type']) {
@@ -1225,7 +1226,8 @@
   })();
 
   (async function initSession() {
-    const jwt = _getJwt();
+    const jwtRaw = _getJwt();
+    const jwt = jwtRaw && String(jwtRaw).trim();
     const headers = { Accept: 'application/json' };
     if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
     try {
