@@ -51,7 +51,7 @@
   function _removeJwt() {
     try { localStorage.removeItem(JWT_KEY); } catch(e) {}
     document.cookie = JWT_KEY + '=; Max-Age=0' + _cookieFlags();
-    fetch(apiUrl('/auth/logout'), { method: 'POST', credentials: 'same-origin' }).catch(function () {});
+    fetch(apiUrl('/auth/logout'), { method: 'POST', credentials: 'include' }).catch(function () {});
   }
 
   function toast(msg, isErr) {
@@ -71,7 +71,8 @@
       headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(opts.body);
     }
-    const r = await fetch(apiUrl(path), Object.assign({}, opts, { headers, credentials: 'same-origin' }));
+    const cred = opts.credentials !== undefined ? opts.credentials : 'include';
+    const r = await fetch(apiUrl(path), Object.assign({}, opts, { headers, credentials: cred }));
     const ct = r.headers.get('content-type') || '';
     const data = ct.includes('json') ? await r.json().catch(() => ({})) : await r.text();
     if (!r.ok) {
@@ -1034,7 +1035,7 @@
     try {
       const r = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
-        credentials: 'same-origin',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           login: $('#inp-login').value.trim(),
@@ -1200,17 +1201,21 @@
     const wrap = $('#refresh-split-wrap');
     if (!menu || !pop || !wrap) return;
     menu.addEventListener('click', (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      pop.classList.toggle('hidden');
-      menu.setAttribute('aria-expanded', String(!pop.classList.contains('hidden')));
+      const nowHidden = pop.classList.toggle('hidden');
+      menu.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
     });
     pop.addEventListener('click', (e) => e.stopPropagation());
+    /* После обработчика кнопки: иначе в части браузеров document закрывает попап в том же тике */
     document.addEventListener('click', (e) => {
       if (wrap.contains(e.target)) return;
-      if (!pop.classList.contains('hidden')) {
-        pop.classList.add('hidden');
-        menu.setAttribute('aria-expanded', 'false');
-      }
+      window.setTimeout(() => {
+        if (!pop.classList.contains('hidden')) {
+          pop.classList.add('hidden');
+          menu.setAttribute('aria-expanded', 'false');
+        }
+      }, 0);
     });
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || pop.classList.contains('hidden')) return;
@@ -1224,7 +1229,7 @@
     const headers = {};
     if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
     try {
-      const r = await fetch(apiUrl('/auth/me'), { credentials: 'same-origin', headers: headers });
+      const r = await fetch(apiUrl('/auth/me'), { credentials: 'include', headers: headers });
       if (!r.ok) {
         _removeJwt();
         showApp(false);

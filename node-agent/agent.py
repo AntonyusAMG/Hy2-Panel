@@ -868,10 +868,15 @@ def _landing_html(request: Request, *, not_found: bool) -> str:
 </html>"""
 
 
+# Без этого браузер кеширует index.html/app.js — пользователь месяцами видит старую логику авторизации
+_UI_HTML_HEADERS = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+_UI_ASSET_HEADERS = {"Cache-Control": "max-age=0, must-revalidate, private"}
+
+
 def _serve_ui_file() -> FileResponse:
     if not _ui_path.is_file():
         raise HTTPException(status_code=404, detail="ui/index.html not found")
-    return FileResponse(_ui_path, media_type="text/html; charset=utf-8")
+    return FileResponse(_ui_path, media_type="text/html; charset=utf-8", headers=dict(_UI_HTML_HEADERS))
 
 
 def _trunc_happ_title(s: str, max_len: int = 25) -> str:
@@ -1260,7 +1265,7 @@ async def ui_css() -> FileResponse:
     path = _ui_path.parent / "style.css"
     if not path.is_file():
         raise HTTPException(status_code=404)
-    return FileResponse(path, media_type="text/css")
+    return FileResponse(path, media_type="text/css", headers=dict(_UI_ASSET_HEADERS))
 
 
 @app.get("/ui/app.js", include_in_schema=False)
@@ -1268,7 +1273,7 @@ async def ui_js() -> FileResponse:
     path = _ui_path.parent / "app.js"
     if not path.is_file():
         raise HTTPException(status_code=404)
-    return FileResponse(path, media_type="application/javascript")
+    return FileResponse(path, media_type="application/javascript", headers=dict(_UI_ASSET_HEADERS))
 
 
 @app.get("/healthz")
