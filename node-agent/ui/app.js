@@ -1,11 +1,10 @@
 (function () {
   const JWT_KEY = 'hy2_jwt';
   const THEME_KEY = 'hy2_theme';
-  const TRAFFIC_HIST_KEY = 'hy2_traffic_daily_v2';
+  const ACCENTS_KEY = 'hy2_accents';
   const AUTO_REFRESH_KEY = 'hy2_auto_refresh';
   const AUTO_INTERVAL_KEY = 'hy2_refresh_interval_sec';
-  const THEMES = ['ios26-liquid', 'tg-dark', 'crm-soft', 'light', 'accent-violet'];
-  const THEME_LABELS = { 'ios26-liquid': 'iOS 26 Liquid', 'tg-dark': 'TG Dark', 'crm-soft': 'CRM soft', 'light': 'Светлая', 'accent-violet': 'Violet' };
+  const MODES = ['dark', 'light'];
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -25,7 +24,171 @@
 
   function _cookieFlags() {
     const sec = typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : '';
-    return '; path=/; SameSite=Strict' + sec;
+    /* Как у Set-Cookie в agent.py — иначе Max-Age=0 может не снять зеркальную не-HttpOnly куку */
+    return '; path=/; SameSite=Lax' + sec;
+  }
+
+  /* Тема и автообновление: дублируем в cookie — Safari/ITP часто режет localStorage, а <html data-theme="light"> перезаписывал выбор при F5 */
+  const _UI_PREF_MAX_AGE = 365 * 24 * 60 * 60;
+
+  function _uiPrefGet(key) {
+    let ls = null;
+    try {
+      ls = localStorage.getItem(key);
+    } catch (e) {}
+    if (ls != null && String(ls).trim() !== '') {
+      return String(ls).trim();
+    }
+    const needle = key + '=';
+    const parts = document.cookie.split(';');
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i].trim();
+      if (p.indexOf(needle) !== 0) continue;
+      let v = p.slice(needle.length);
+      try {
+        v = decodeURIComponent(v);
+      } catch (e) {}
+      v = String(v).trim();
+      if (v !== '') return v;
+    }
+    return null;
+  }
+
+  function _uiPrefSet(key, value) {
+    const s = String(value);
+    try {
+      localStorage.setItem(key, s);
+    } catch (e) {}
+    try {
+      document.cookie =
+        key + '=' + encodeURIComponent(s) + '; Max-Age=' + _UI_PREF_MAX_AGE + _cookieFlags();
+    } catch (e) {}
+  }
+
+  function _uiPrefRemove(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {}
+    try {
+      document.cookie = key + '=; Max-Age=0' + _cookieFlags();
+    } catch (e) {}
+  }
+
+  const UI_KEYS = {
+    blurMult: 'hy2_ui_blur_mult',
+    chromeBlur: 'hy2_ui_chrome_blur',
+    satMult: 'hy2_ui_sat_mult',
+    fontScale: 'hy2_ui_font_scale',
+    reduceMotion: 'hy2_ui_reduce_motion',
+  };
+
+  const UI_DEFAULTS = {
+    blurMult: 100,
+    chromeBlur: 100,
+    satMult: 100,
+    fontScale: 100,
+    reduceMotion: '0',
+  };
+
+  function clampUiNum(n, lo, hi) {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return lo;
+    return Math.min(hi, Math.max(lo, x));
+  }
+
+  function uiPrefInt(key, def, lo, hi) {
+    const v = _uiPrefGet(key);
+    if (v == null || v === '') return def;
+    return clampUiNum(parseInt(v, 10), lo, hi);
+  }
+
+  function syncUiBlurSat() {
+    const root = document.documentElement;
+    const st = getComputedStyle(root);
+    const blurNum = parseFloat(st.getPropertyValue('--glass-blur')) || 32;
+    const bm = clampUiNum(parseFloat(_uiPrefGet(UI_KEYS.blurMult) || '100') / 100, 0.5, 1.5);
+    const baseEff = blurNum * bm;
+    root.style.setProperty('--hy2-ui-blur-effective', baseEff + 'px');
+    const chromePct = uiPrefInt(UI_KEYS.chromeBlur, UI_DEFAULTS.chromeBlur, 0, 100) / 100;
+    root.style.setProperty('--hy2-chrome-blur-effective', baseEff * chromePct + 'px');
+    const satStr = st.getPropertyValue('--glass-saturation').trim() || '160%';
+    const satNum = parseFloat(satStr) || 160;
+    const sm = clampUiNum(parseFloat(_uiPrefGet(UI_KEYS.satMult) || '100') / 100, 0.75, 1.25);
+    root.style.setProperty('--hy2-ui-sat-effective', satNum * sm + '%');
+  }
+
+  function applyUiPrefs() {
+    const root = document.documentElement;
+    root.style.setProperty('--hy2-ui-card-mix', '100%');
+    root.style.setProperty('--hy2-ui-chrome-mix', '88%');
+    root.style.setProperty('--hy2-ui-srv-page-mix', '100%');
+    root.style.setProperty('--hy2-ui-mesh-mult', '1');
+    root.style.setProperty('--hy2-ui-main-glow-mult', '1');
+    root.style.setProperty('--hy2-ui-bg-overlay', '0');
+    const fs = uiPrefInt(UI_KEYS.fontScale, UI_DEFAULTS.fontScale, 90, 110) / 100;
+    root.style.setProperty('--hy2-ui-font-scale', String(fs));
+    syncUiBlurSat();
+    const rm = (_uiPrefGet(UI_KEYS.reduceMotion) || UI_DEFAULTS.reduceMotion) === '1';
+    root.classList.toggle('hy2-reduce-motion', rm);
+  }
+
+  function refreshSettingsForm() {
+    function setRange(id, val, valId, suffix) {
+      const el = document.getElementById(id);
+      const vEl = document.getElementById(valId);
+      if (el) el.value = String(val);
+      if (vEl) vEl.textContent = suffix ? val + suffix : String(val);
+    }
+    const bm = uiPrefInt(UI_KEYS.blurMult, UI_DEFAULTS.blurMult, 50, 150);
+    setRange('ui-blur-mult', bm, 'ui-blur-mult-val', '%');
+    const chromeBlurVal = uiPrefInt(UI_KEYS.chromeBlur, UI_DEFAULTS.chromeBlur, 0, 100);
+    setRange('ui-chrome-blur', chromeBlurVal, 'ui-chrome-blur-val', '%');
+    const sm = uiPrefInt(UI_KEYS.satMult, UI_DEFAULTS.satMult, 75, 125);
+    setRange('ui-sat-mult', sm, 'ui-sat-mult-val', '%');
+    const fs = uiPrefInt(UI_KEYS.fontScale, UI_DEFAULTS.fontScale, 90, 110);
+    setRange('ui-font-scale', fs, 'ui-font-scale-val', '%');
+    const reduceMotionEl = document.getElementById('ui-reduce-motion');
+    if (reduceMotionEl) reduceMotionEl.checked = (_uiPrefGet(UI_KEYS.reduceMotion) || '0') === '1';
+  }
+
+  function initSettingsSection() {
+    function wireRange(id, key, valId, suffix) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const vEl = document.getElementById(valId);
+      el.addEventListener('input', function () {
+        _uiPrefSet(key, el.value);
+        if (vEl) vEl.textContent = suffix ? el.value + suffix : el.value;
+        applyUiPrefs();
+      });
+    }
+    wireRange('ui-blur-mult', UI_KEYS.blurMult, 'ui-blur-mult-val', '%');
+    wireRange('ui-chrome-blur', UI_KEYS.chromeBlur, 'ui-chrome-blur-val', '%');
+    wireRange('ui-sat-mult', UI_KEYS.satMult, 'ui-sat-mult-val', '%');
+    wireRange('ui-font-scale', UI_KEYS.fontScale, 'ui-font-scale-val', '%');
+    const rmc = document.getElementById('ui-reduce-motion');
+    if (rmc) {
+      rmc.addEventListener('change', function () {
+        _uiPrefSet(UI_KEYS.reduceMotion, rmc.checked ? '1' : '0');
+        applyUiPrefs();
+      });
+    }
+    const resetBtn = document.getElementById('ui-reset-defaults');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function () {
+        if (!confirm('Сбросить все настройки вида к значениям по умолчанию?')) return;
+        Object.keys(UI_KEYS).forEach(function (k) {
+          _uiPrefRemove(UI_KEYS[k]);
+        });
+        _uiPrefRemove(ACCENTS_KEY);
+        loadAccents();
+        applyUiPrefs();
+        refreshSettingsForm();
+        if (_getJwt()) void renderChart().catch(function () {});
+        toast('Настройки вида сброшены');
+      });
+    }
+    refreshSettingsForm();
   }
 
   function _setJwt(token) {
@@ -48,14 +211,21 @@
     }
   }
 
-  function _removeJwt() {
-    try { localStorage.removeItem(JWT_KEY); } catch(e) {}
+  function _removeJwtLocal() {
+    try {
+      localStorage.removeItem(JWT_KEY);
+    } catch (e) {}
     document.cookie = JWT_KEY + '=; Max-Age=0' + _cookieFlags();
+  }
+
+  function _removeJwt() {
+    _removeJwtLocal();
     fetch(apiUrl('/auth/logout'), { method: 'POST', credentials: 'include' }).catch(function () {});
   }
 
   function toast(msg, isErr) {
     const el = $('#toast');
+    if (!el) return;
     el.textContent = msg;
     el.classList.toggle('err', !!isErr);
     el.classList.remove('hidden');
@@ -78,10 +248,13 @@
     const data = ct.includes('json') ? await r.json().catch(() => ({})) : await r.text();
     if (!r.ok) {
       const authPath = path.startsWith('/auth/');
+      /* 401 без Bearer на старте — гость; не трогаем JWT (иначе «поздний» 401 сбросит сессию после входа). */
       if (r.status === 401 && !authPath) {
-        _removeJwt();
-        showApp(false);
-        throw new Error('Сессия истекла — войдите снова');
+        if (jwt) {
+          _removeJwt();
+          showApp(false);
+        }
+        throw new Error(jwt ? 'Сессия истекла — войдите снова' : 'Требуется вход');
       }
       const d = typeof data === 'object' && data.detail !== undefined ? data.detail : data;
       throw new Error(typeof d === 'string' ? d : JSON.stringify(d));
@@ -268,18 +441,6 @@
     return rows;
   }
 
-  function loadTrafficDayRows() {
-    try {
-      const x = JSON.parse(localStorage.getItem(TRAFFIC_HIST_KEY) || '{}');
-      if (x && Array.isArray(x.days)) return x.days;
-    } catch (e) {}
-    return [];
-  }
-
-  function saveTrafficDayRows(rows) {
-    localStorage.setItem(TRAFFIC_HIST_KEY, JSON.stringify({ days: rows.slice(-45) }));
-  }
-
   function localDateKey(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -287,119 +448,200 @@
     return y + '-' + m + '-' + day;
   }
 
-  function todayStr() {
-    return localDateKey(new Date());
-  }
-
-  function prevCalendarDayKey(dayKey) {
-    const p = dayKey.split('-').map((n) => parseInt(n, 10));
-    if (p.length !== 3 || p.some((x) => !Number.isFinite(x))) return '';
-    const dt = new Date(p[0], p[1] - 1, p[2]);
-    dt.setDate(dt.getDate() - 1);
-    return localDateKey(dt);
-  }
-
-  /** Сохранить максимальный накопительный total за день + первый замер дня (если нет «вчера» в истории). */
-  function pushDailyTrafficSample(cumulativeTotal) {
-    const c = Math.max(0, Number(cumulativeTotal) || 0);
-    const t = todayStr();
-    const rows = loadTrafficDayRows();
-    let row = rows.find((r) => r.d === t);
-    if (!row) {
-      row = { d: t, cum: c, first: c };
-      rows.push(row);
-    } else {
-      row.cum = Math.max(row.cum || 0, c);
-      if (typeof row.first !== 'number' || !Number.isFinite(row.first)) row.first = c;
-      else row.first = Math.min(row.first, c);
-    }
-    rows.sort((a, b) => a.d.localeCompare(b.d));
-    saveTrafficDayRows(rows);
-  }
-
-  function rowMapByDay(rows) {
-    const m = {};
-    rows.forEach((r) => {
-      if (r && r.d) m[r.d] = r;
-    });
-    return m;
-  }
-
-  /** Байты за календарный день: cum(день) − cum(вчера); если вчера нет — cum − first замер этого дня. */
-  function dailyTrafficDeltaBytes(dayKey, rows) {
-    const map = rowMapByDay(rows);
-    const row = map[dayKey];
-    if (!row || typeof row.cum !== 'number') return 0;
-    const prevK = prevCalendarDayKey(dayKey);
-    const prev = prevK && map[prevK];
-    if (prev && typeof prev.cum === 'number') {
-      return Math.max(0, row.cum - prev.cum);
-    }
-    const first = typeof row.first === 'number' ? row.first : row.cum;
-    return Math.max(0, row.cum - first);
-  }
-
   const OVERVIEW_CHART_DAYS = 30;
+  const TRAFFIC_WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  let trafficLineChart = null;
+  let trafficChartResizeObs = null;
 
-  function renderChart() {
-    const rows = loadTrafficDayRows();
+  /** На узком графике большой hitRadius даёт перекрытие соседних дней — тултип и «статистика» не совпадают с касанием. */
+  function trafficChartHitRadiusPx() {
+    const wrap = document.querySelector('.hy2-chart-canvas-wrap');
+    const w = wrap && wrap.clientWidth > 40 ? wrap.clientWidth : Math.max(280, window.innerWidth - 48);
+    const per = w / OVERVIEW_CHART_DAYS;
+    return Math.max(5, Math.min(15, Math.floor(per * 0.4)));
+  }
+
+  function attachTrafficChartResizeObserver(canvas) {
+    const el = canvas && canvas.parentElement;
+    if (!el || trafficChartResizeObs) return;
+    trafficChartResizeObs = new ResizeObserver(() => {
+      if (!trafficLineChart) return;
+      trafficLineChart.resize();
+      const r = trafficChartHitRadiusPx();
+      const ds0 = trafficLineChart.data.datasets[0];
+      if (ds0) {
+        ds0.pointHitRadius = r;
+        ds0.pointHoverRadius = Math.min(9, r + 2);
+      }
+      trafficLineChart.update('none');
+    });
+    trafficChartResizeObs.observe(el);
+  }
+
+  function colorWithAlpha(c, a) {
+    const s = (c || '').trim();
+    const rgbM = s.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (rgbM) return 'rgba(' + rgbM[1] + ',' + rgbM[2] + ',' + rgbM[3] + ',' + a + ')';
+    if (s.startsWith('#') && s.length === 7) {
+      const r = parseInt(s.slice(1, 3), 16);
+      const g = parseInt(s.slice(3, 5), 16);
+      const b = parseInt(s.slice(5, 7), 16);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+    }
+    return s || 'rgba(167,139,250,' + a + ')';
+  }
+
+  function accentColorForChart(slot) {
+    const root = document.documentElement;
+    if (root.classList.contains('hy2-accent-' + slot + '-off')) {
+      return root.getAttribute('data-theme') === 'light' ? 'rgba(150,140,180,0.45)' : 'rgba(200,200,220,0.35)';
+    }
+    const m = { 1: '--hy2-acc-1', 2: '--hy2-acc-2', 3: '--hy2-acc-3', 4: '--hy2-acc-4' };
+    const v = getComputedStyle(root).getPropertyValue(m[slot] || '--accent').trim();
+    return v || '#a78bfa';
+  }
+
+  function updateTrafficLineChart(days, vals, dayObjs) {
+    const canvas = document.getElementById('traffic-chart-canvas');
+    if (!canvas || typeof Chart === 'undefined') return;
+    const labels = dayObjs.map((di) => {
+      if (!di || isNaN(di.getTime())) return '';
+      const dd = String(di.getUTCDate()).padStart(2, '0');
+      const mm = String(di.getUTCMonth() + 1).padStart(2, '0');
+      return dd + '.' + mm;
+    });
+    const c1 = accentColorForChart(1);
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const grid = isLight ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.06)';
+    const tick = isLight ? '#6b6394' : 'rgba(200,180,255,0.55)';
+    const hitR = trafficChartHitRadiusPx();
+    const ds = {
+      labels,
+      datasets: [
+        {
+          label: 'Байт/сутки',
+          data: vals,
+          borderColor: c1,
+          backgroundColor: colorWithAlpha(c1, 0.14),
+          borderWidth: 2,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 0,
+          pointHoverRadius: Math.min(9, hitR + 2),
+          pointHitRadius: hitR,
+        },
+      ],
+    };
+    if (trafficLineChart) {
+      trafficLineChart.$hy2 = { days, dayObjs };
+      trafficLineChart.data.labels = labels;
+      trafficLineChart.data.datasets[0].data = vals;
+      trafficLineChart.data.datasets[0].borderColor = c1;
+      trafficLineChart.data.datasets[0].backgroundColor = colorWithAlpha(c1, 0.14);
+      trafficLineChart.data.datasets[0].pointHitRadius = hitR;
+      trafficLineChart.data.datasets[0].pointHoverRadius = Math.min(9, hitR + 2);
+      trafficLineChart.options.scales.x.grid.color = grid;
+      trafficLineChart.options.scales.y.grid.color = grid;
+      trafficLineChart.options.scales.x.ticks.color = tick;
+      trafficLineChart.options.scales.y.ticks.color = tick;
+      trafficLineChart.update();
+      return;
+    }
+    trafficLineChart = new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: ds,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', axis: 'x', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title(items) {
+                const it = items[0];
+                const meta = it.chart.$hy2 || { days: [], dayObjs: [] };
+                const i = it.dataIndex;
+                const di = meta.dayObjs[i];
+                const dk = meta.days[i];
+                if (di != null && dk && !isNaN(di.getTime())) {
+                  return TRAFFIC_WD[di.getUTCDay()] + ', ' + dk;
+                }
+                return it.label || '';
+              },
+              label(ctx) {
+                const raw = ctx.chart.data.datasets[ctx.datasetIndex].data[ctx.dataIndex];
+                const v = typeof raw === 'number' && Number.isFinite(raw) ? raw : (ctx.parsed && ctx.parsed.y != null ? ctx.parsed.y : 0);
+                return 'За сутки: ' + formatBytes(v);
+              },
+            },
+          },
+        },
+        scales: {
+          x: { grid: { color: grid }, ticks: { color: tick, maxRotation: 45, font: { size: 9 } } },
+          y: {
+            beginAtZero: true,
+            grid: { color: grid },
+            ticks: {
+              color: tick,
+              font: { size: 9 },
+              callback(v) {
+                return formatBytes(Number(v));
+              },
+            },
+          },
+        },
+      },
+    });
+    trafficLineChart.$hy2 = { days, dayObjs };
+    attachTrafficChartResizeObserver(canvas);
+  }
+
+  async function renderChart() {
     const days = [];
     const dayObjs = [];
-    for (let i = OVERVIEW_CHART_DAYS - 1; i >= 0; i--) {
-      const dt = new Date();
-      dt.setHours(12, 0, 0, 0);
-      dt.setDate(dt.getDate() - i);
-      days.push(localDateKey(dt));
-      dayObjs.push(dt);
-    }
-    const vals = days.map((d) => dailyTrafficDeltaBytes(d, rows));
-    const max = Math.max(...vals, 1);
-    const BAR_PX = 136;
-    const root = $('#chart-bars');
-    if (!root) return;
-    root.innerHTML = '';
-    const wd = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-    days.forEach((d, i) => {
-      const col = document.createElement('div');
-      col.className = 'bar-col';
-      const stack = document.createElement('div');
-      stack.className = 'bar-stack';
-      const bar = document.createElement('div');
-      bar.className = 'bar' + (vals[i] > 0 ? '' : ' bar--empty');
-      const pct = vals[i] / max;
-      bar.style.height = Math.max(4, Math.round(pct * BAR_PX)) + 'px';
-      if (vals[i] > 0) {
-        const inner = document.createElement('span');
-        inner.className = 'bar-val-inside';
-        inner.textContent = formatBytes(vals[i]);
-        bar.appendChild(inner);
+    const vals = [];
+    try {
+      const res = await api('/traffic/daily?days=' + OVERVIEW_CHART_DAYS);
+      const arr = res && Array.isArray(res.days) ? res.days : [];
+      arr.forEach(function (row) {
+        if (!row || row.date == null) return;
+        const dk = String(row.date);
+        days.push(dk);
+        const p = dk.split('-').map(function (x) {
+          return parseInt(x, 10);
+        });
+        const di =
+          p.length === 3 && p.every(function (n) {
+            return Number.isFinite(n);
+          })
+            ? new Date(Date.UTC(p[0], p[1] - 1, p[2], 12, 0, 0))
+            : new Date(NaN);
+        dayObjs.push(di);
+        vals.push(Math.max(0, Number(row.bytes) || 0));
+      });
+    } catch (e) {}
+    if (!vals.length) {
+      for (let i = OVERVIEW_CHART_DAYS - 1; i >= 0; i--) {
+        const dt = new Date();
+        dt.setHours(12, 0, 0, 0);
+        dt.setDate(dt.getDate() - i);
+        const dk = localDateKey(dt);
+        days.push(dk);
+        const p = dk.split('-').map(function (x) {
+          return parseInt(x, 10);
+        });
+        dayObjs.push(
+          p.length === 3 && p.every(function (n) {
+            return Number.isFinite(n);
+          })
+            ? new Date(Date.UTC(p[0], p[1] - 1, p[2], 12, 0, 0))
+            : new Date(NaN),
+        );
+        vals.push(0);
       }
-      const lab = document.createElement('span');
-      lab.className = 'bar-label bar-label--stacked';
-      const di = dayObjs[i];
-      const dd = String(di.getDate()).padStart(2, '0');
-      const mm = String(di.getMonth() + 1).padStart(2, '0');
-      lab.innerHTML =
-        '<span class="bar-label-wd">' +
-        wd[di.getDay()] +
-        '</span><span class="bar-label-dt">' +
-        dd +
-        '.' +
-        mm +
-        '</span>';
-      col.title =
-        wd[di.getDay()] +
-        ', ' +
-        d +
-        ' · ' +
-        (vals[i] > 0
-          ? formatBytes(vals[i]) + ' (прирост за сутки)'
-          : 'нет данных за день (нужны обновления обзора и соседний день в истории)');
-      stack.appendChild(bar);
-      col.appendChild(stack);
-      col.appendChild(lab);
-      root.appendChild(col);
-    });
+    }
+    updateTrafficLineChart(days, vals, dayObjs);
   }
 
   let currentSection = 'overview';
@@ -431,12 +673,18 @@
     if (currentSection === 'users') return loadUsers();
     if (currentSection === 'config') return loadConfig();
     if (currentSection === 'server') return loadServer();
+    if (currentSection === 'settings') return;
   }
 
   function showSection(id) {
     currentSection = id;
-    $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.section === id));
-    ['overview', 'users', 'config', 'server'].forEach((s) => {
+    $$('.dock-item').forEach((b) => {
+      const on = b.dataset.section === id;
+      b.classList.toggle('active', on);
+      if (on) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
+    });
+    ['overview', 'users', 'config', 'server', 'settings'].forEach((s) => {
       $('#sec-' + s).classList.toggle('hidden', s !== id);
     });
     clearSectionRefresh();
@@ -444,6 +692,7 @@
     if (id === 'users') loadUsers();
     if (id === 'config') loadConfig();
     if (id === 'server') loadServer();
+    if (id === 'settings') refreshSettingsForm();
     scheduleSectionRefresh();
   }
 
@@ -512,6 +761,19 @@
     METRIC_TINTS.forEach((c) => card.classList.remove(c));
     card.classList.add(tintClass);
   }
+
+  const HY2_ICO_LINK =
+    '<svg class="hy2-tbl-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>';
+  const HY2_ICO_RESET =
+    '<svg class="hy2-tbl-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>';
+  const HY2_ICO_DEL =
+    '<svg class="hy2-tbl-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M10 11v6M14 11v6"/></svg>';
+  const HY2_ICO_RESTART =
+    '<svg class="hy2-tbl-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>';
+  const HY2_ICO_STOP =
+    '<svg class="hy2-tbl-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>';
+  const HY2_ICO_START =
+    '<svg class="hy2-tbl-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="8 5 19 12 8 19 8 5"/></svg>';
 
   async function loadOverview(silent) {
     try {
@@ -620,8 +882,7 @@
       }
       applyMetricTint('m-online', onlineTint);
       $('#m-uptime').textContent = formatUptime(st.uptime_seconds);
-      pushDailyTrafficSample(sum.total);
-      renderChart();
+      await renderChart();
 
       const tb = $('#tbl-conn');
       tb.innerHTML = '';
@@ -677,11 +938,26 @@
           '<td style="min-width:140px"><div class="mono" style="font-size:0.8rem">' + formatBytes(p.up) + ' ↑ / ' + formatBytes(p.down) + ' ↓</div><div class="progress"><i style="width:' + pct + '%"></i></div></td>' +
           '<td class="muted">—</td><td class="muted">—</td>' +
           '<td>' + statusHtml + '</td>' +
-          '<td style="white-space:nowrap">' +
-          '<button type="button" class="btn btn-ghost" data-act="link" data-id="' + id + '">Ссылка</button> ' +
-          '<button type="button" class="btn btn-ghost" data-act="reset" data-id="' + id + '">Сброс</button> ' +
-          '<button type="button" class="btn btn-danger" data-act="del" data-id="' + id + '">Удалить</button>' +
-          '</td>';
+          '<td class="hy2-tbl-actions"><div class="hy2-tbl-act-row">' +
+          '<button type="button" class="btn btn-info hy2-tbl-act" data-act="link" data-id="' +
+          id +
+          '" title="Ссылка" aria-label="Ссылка">' +
+          '<span class="hy2-tbl-act-ico" aria-hidden="true">' +
+          HY2_ICO_LINK +
+          '</span><span class="hy2-tbl-act-txt">Ссылка</span></button> ' +
+          '<button type="button" class="btn btn-warning hy2-tbl-act" data-act="reset" data-id="' +
+          id +
+          '" title="Сброс пароля" aria-label="Сброс пароля">' +
+          '<span class="hy2-tbl-act-ico" aria-hidden="true">' +
+          HY2_ICO_RESET +
+          '</span><span class="hy2-tbl-act-txt">Сброс</span></button> ' +
+          '<button type="button" class="btn btn-danger hy2-tbl-act" data-act="del" data-id="' +
+          id +
+          '" title="Удалить" aria-label="Удалить">' +
+          '<span class="hy2-tbl-act-ico" aria-hidden="true">' +
+          HY2_ICO_DEL +
+          '</span><span class="hy2-tbl-act-txt">Удалить</span></button>' +
+          '</div></td>';
         tb.appendChild(tr);
       });
       tb.querySelectorAll('button[data-act]').forEach((btn) => {
@@ -888,11 +1164,26 @@
         tr.innerHTML =
           '<td class="mono">' + name + '</td>' +
           '<td><span class="status-pill ' + (ok ? 'ok' : 'bad') + '">' + active + '</span></td>' +
-          '<td>' +
-          '<button type="button" class="btn btn-ghost" data-svc="' + svcKey + '" data-a="restart">Restart</button> ' +
-          '<button type="button" class="btn btn-ghost" data-svc="' + svcKey + '" data-a="stop">Stop</button> ' +
-          '<button type="button" class="btn btn-ghost" data-svc="' + svcKey + '" data-a="start">Start</button>' +
-          '</td>';
+          '<td class="hy2-tbl-actions"><div class="hy2-tbl-act-row">' +
+          '<button type="button" class="btn btn-restart hy2-tbl-act" data-svc="' +
+          svcKey +
+          '" data-a="restart" title="Перезапуск" aria-label="Перезапуск">' +
+          '<span class="hy2-tbl-act-ico" aria-hidden="true">' +
+          HY2_ICO_RESTART +
+          '</span><span class="hy2-tbl-act-txt">Restart</span></button> ' +
+          '<button type="button" class="btn btn-warning hy2-tbl-act" data-svc="' +
+          svcKey +
+          '" data-a="stop" title="Остановить" aria-label="Остановить">' +
+          '<span class="hy2-tbl-act-ico" aria-hidden="true">' +
+          HY2_ICO_STOP +
+          '</span><span class="hy2-tbl-act-txt">Stop</span></button> ' +
+          '<button type="button" class="btn btn-success hy2-tbl-act" data-svc="' +
+          svcKey +
+          '" data-a="start" title="Запустить" aria-label="Запустить">' +
+          '<span class="hy2-tbl-act-ico" aria-hidden="true">' +
+          HY2_ICO_START +
+          '</span><span class="hy2-tbl-act-txt">Start</span></button>' +
+          '</div></td>';
         tb.appendChild(tr);
         tr.querySelectorAll('button[data-svc]').forEach((b) => {
           b.addEventListener('click', async () => {
@@ -919,7 +1210,7 @@
   }
 
   function applyHljsTheme() {
-    const t = document.documentElement.getAttribute('data-theme') || 'tg-dark';
+    const t = document.documentElement.getAttribute('data-theme') || 'dark';
     const dark = t !== 'light';
     const link = document.getElementById('hljs-theme');
     if (link) {
@@ -929,110 +1220,110 @@
     }
   }
 
-  function syncLoginThemeChips() {
-    const cur = document.documentElement.getAttribute('data-theme') || 'tg-dark';
-    const name = THEME_LABELS[cur] || cur;
-    const lbl = $('#login-theme-current-label');
-    if (lbl) lbl.textContent = name;
-    const appLbl = $('#app-theme-current-label');
-    if (appLbl) appLbl.textContent = name;
-    const btnTheme = $('#btn-theme');
-    if (btnTheme) btnTheme.setAttribute('title', 'Тема: ' + name);
-    $$('#login-theme-chips [data-theme-set], #app-theme-dd [data-theme-set]').forEach((b) => {
-      b.classList.toggle('active', b.getAttribute('data-theme-set') === cur);
-    });
+  function syncModeLabels() {
+    const t = document.documentElement.getAttribute('data-theme') || 'dark';
+    const name = t === 'light' ? 'Светлая' : 'Тёмная';
+    const ll = $('#login-theme-mode-label');
+    const al = $('#app-theme-mode-label');
+    if (ll) ll.textContent = name;
+    if (al) al.textContent = name;
   }
 
-  function closeLoginThemeMenu() {
-    const m = $('#login-theme-menu');
-    const tr = $('#btn-login-theme');
-    const wrap = document.querySelector('#login-theme-chips.login-theme-dd');
-    if (m && !m.classList.contains('hidden')) m.classList.add('hidden');
-    if (tr) tr.setAttribute('aria-expanded', 'false');
-    if (wrap) wrap.classList.remove('open');
-  }
-
-  function closeAppThemeMenu() {
-    const m = $('#app-theme-menu');
-    const tr = $('#btn-theme');
-    const wrap = $('#app-theme-dd');
-    if (m && !m.classList.contains('hidden')) m.classList.add('hidden');
-    if (tr) tr.setAttribute('aria-expanded', 'false');
-    if (wrap) wrap.classList.remove('open');
-  }
-
-  function closeAllThemeMenus() {
-    closeLoginThemeMenu();
-    closeAppThemeMenu();
-  }
+  function closeAllThemeMenus() {}
 
   function closeRefreshPopover() {
     const pop = $('#refresh-popover');
     const menu = $('#btn-refresh-menu');
-    if (pop && !pop.classList.contains('hidden')) {
+    if (!pop) return;
+    try {
+      if (typeof pop.hidePopover === 'function' && pop.matches(':popover-open')) pop.hidePopover();
+    } catch (e) {}
+    if (!pop.classList.contains('hidden')) {
       pop.classList.add('hidden');
       if (menu) menu.setAttribute('aria-expanded', 'false');
     }
   }
 
-  function toggleLoginThemeMenu() {
-    closeAppThemeMenu();
-    closeRefreshPopover();
-    const m = $('#login-theme-menu');
-    const tr = $('#btn-login-theme');
-    const wrap = document.querySelector('#login-theme-chips.login-theme-dd');
-    if (!m || !tr || !wrap) return;
-    const nowHidden = m.classList.toggle('hidden');
-    tr.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
-    wrap.classList.toggle('open', !nowHidden);
-  }
-
-  function toggleAppThemeMenu() {
-    closeLoginThemeMenu();
-    closeRefreshPopover();
-    const m = $('#app-theme-menu');
-    const tr = $('#btn-theme');
-    const wrap = $('#app-theme-dd');
-    if (!m || !tr || !wrap) return;
-    const nowHidden = m.classList.toggle('hidden');
-    tr.setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
-    wrap.classList.toggle('open', !nowHidden);
-  }
-
-  function setTheme(t) {
-    if (THEMES.indexOf(t) < 0) t = 'tg-dark';
-    document.documentElement.setAttribute('data-theme', t);
-    localStorage.setItem(THEME_KEY, t);
+  function setMode(mode) {
+    if (MODES.indexOf(mode) < 0) mode = 'dark';
+    document.documentElement.setAttribute('data-theme', mode);
+    _uiPrefSet(THEME_KEY, mode);
     applyHljsTheme();
-    syncLoginThemeChips();
+    syncModeLabels();
+    syncUiBlurSat();
     if ($('#cfg-yaml') && $('#cfg-yaml').textContent && window.hljs) {
       hljs.highlightElement($('#cfg-yaml'));
     }
+    if (_getJwt()) void renderChart().catch(function () {});
   }
 
-  function setSidebarOpen(open) {
-    const sb = $('#sidebar');
-    const ov = $('#sidebar-overlay');
-    if (sb) sb.classList.toggle('open', !!open);
-    if (ov) ov.classList.toggle('hidden', !open);
+  function toggleUIMode() {
+    const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    setMode(cur === 'light' ? 'dark' : 'light');
+  }
+
+  function loadAccents() {
+    let raw = _uiPrefGet(ACCENTS_KEY);
+    const arr = [true, true, true, true];
+    try {
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (Array.isArray(p) && p.length >= 4) {
+          for (let i = 0; i < 4; i++) arr[i] = !!p[i];
+        }
+      }
+    } catch (e) {}
+    for (let i = 1; i <= 4; i++) {
+      document.documentElement.classList.toggle('hy2-accent-' + i + '-off', !arr[i - 1]);
+      const btn = document.querySelector('[data-accent-toggle="' + i + '"]');
+      if (btn) {
+        btn.classList.toggle('off', !arr[i - 1]);
+        btn.classList.toggle('on', arr[i - 1]);
+        btn.setAttribute('aria-pressed', arr[i - 1] ? 'true' : 'false');
+      }
+    }
+  }
+
+  function persistAccentsFromDom() {
+    const arr = [];
+    for (let i = 1; i <= 4; i++) {
+      arr.push(!document.documentElement.classList.contains('hy2-accent-' + i + '-off'));
+    }
+    _uiPrefSet(ACCENTS_KEY, JSON.stringify(arr));
+  }
+
+  function toggleAccentSlot(n) {
+    const offClass = 'hy2-accent-' + n + '-off';
+    document.documentElement.classList.toggle(offClass);
+    const nowOff = document.documentElement.classList.contains(offClass);
+    const btn = document.querySelector('[data-accent-toggle="' + n + '"]');
+    if (btn) {
+      btn.classList.toggle('off', nowOff);
+      btn.classList.toggle('on', !nowOff);
+      btn.setAttribute('aria-pressed', !nowOff ? 'true' : 'false');
+    }
+    persistAccentsFromDom();
+    if (_getJwt()) void renderChart().catch(function () {});
   }
 
   function showApp(show) {
     const login = $('#view-login');
     const app = $('#view-app');
+    if (!login || !app) return;
     if (show) {
       login.classList.add('hidden');
       app.classList.remove('hidden');
       app.classList.remove('app-reveal');
       void app.offsetWidth;
       app.classList.add('app-reveal');
+      syncModeLabels();
       window.setTimeout(function () {
         app.classList.remove('app-reveal');
+        syncModeLabels();
       }, 520);
     } else {
       app.classList.add('hidden');
       login.classList.remove('hidden');
-      setSidebarOpen(false);
     }
   }
 
@@ -1040,6 +1331,138 @@
     _removeJwt();
     showApp(false);
   }
+
+  /* Сразу после объявления showApp: до любых addEventListener, чтобы F5 всегда бил в /auth/me (см. логи Apache). */
+  (async function initSession() {
+    const jwtRaw = _getJwt();
+    let jwt = jwtRaw && String(jwtRaw).trim();
+
+    function meUrl() {
+      try {
+        return new URL(apiUrl('/auth/me'), window.location.origin).href;
+      } catch (e) {
+        return apiUrl('/auth/me');
+      }
+    }
+
+    async function fetchMe(sendBearer) {
+      const headers = { Accept: 'application/json' };
+      if (sendBearer && jwt) headers.Authorization = 'Bearer ' + jwt;
+      return fetch(meUrl(), { credentials: 'include', headers });
+    }
+
+    try {
+      let r = await fetchMe(true);
+      if (r.status === 401 && jwt) {
+        const rCookie = await fetchMe(false);
+        if (rCookie.ok) {
+          _removeJwtLocal();
+          jwt = '';
+          r = rCookie;
+        } else {
+          r = rCookie;
+        }
+      }
+      if (r.status === 401) {
+        _removeJwt();
+        showApp(false);
+        return;
+      }
+      if (!r.ok) {
+        const transient = r.status >= 500 || r.status === 429 || r.status === 408;
+        if (transient) {
+          showApp(!!jwt);
+          if (jwt) showSection('overview');
+          toast('Сервер временно недоступен (' + r.status + '). Повторите через минуту.', true);
+          return;
+        }
+        if (r.status === 404 || r.status === 403) {
+          showApp(!!jwt);
+          if (jwt) showSection('overview');
+          toast(
+            'Проверка сессии: ' + r.status + '. Проверьте URL панели, прокси и заголовки Authorization/Cookie.',
+            true,
+          );
+          return;
+        }
+        showApp(false);
+        toast('Ошибка проверки сессии (' + r.status + '). Обновите страницу.', true);
+        return;
+      }
+      showApp(true);
+      showSection('overview');
+    } catch (e) {
+      showApp(!!jwt);
+      if (jwt) showSection('overview');
+      toast('Нет связи с панелью. Проверьте сеть и обновите страницу.', true);
+    }
+  })();
+
+  (function initRefreshPopover() {
+    const menu = $('#btn-refresh-menu');
+    const pop = $('#refresh-popover');
+    if (!menu || !pop) return;
+
+    pop.removeAttribute('popover');
+    menu.removeAttribute('popovertarget');
+    menu.removeAttribute('popovertargetaction');
+
+    /* #view-app: overflow:hidden + transform (анимация .app-reveal) — обрезают position:fixed у потомков */
+    try {
+      if (pop.parentNode && pop.parentNode !== document.body) {
+        document.body.appendChild(pop);
+      }
+    } catch (e) {}
+
+    function positionRefreshPopover() {
+      const r = menu.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const margin = 10;
+      pop.style.setProperty('--refresh-popover-top', r.bottom + 8 + 'px');
+      const measured = pop.offsetWidth;
+      const pw = measured > 80 ? measured : 248;
+      let left = (vw - pw) / 2;
+      left = Math.max(margin, Math.min(left, vw - pw - margin));
+      pop.style.setProperty('--refresh-popover-left', left + 'px');
+      const cx = r.left + r.width / 2;
+      const popRight = left + pw;
+      const fromRight = popRight - cx - 5;
+      const arrowR = Math.max(14, Math.min(pw - 20, fromRight));
+      pop.style.setProperty('--refresh-popover-arrow-right', arrowR + 'px');
+    }
+
+    function onMenuClick(e) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      closeAllThemeMenus();
+      if (pop.classList.contains('hidden')) {
+        pop.classList.remove('hidden');
+        menu.setAttribute('aria-expanded', 'true');
+        positionRefreshPopover();
+        requestAnimationFrame(() => {
+          positionRefreshPopover();
+          requestAnimationFrame(() => positionRefreshPopover());
+        });
+      } else {
+        pop.classList.add('hidden');
+        menu.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    menu.addEventListener('click', onMenuClick, true);
+    pop.addEventListener('click', (e) => e.stopPropagation());
+    window.addEventListener('resize', () => {
+      if (!pop.classList.contains('hidden')) positionRefreshPopover();
+    });
+    window.addEventListener(
+      'scroll',
+      () => {
+        if (!pop.classList.contains('hidden')) positionRefreshPopover();
+      },
+      true,
+    );
+  })();
 
   $('#form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1066,62 +1489,36 @@
 
   $('#btn-logout').addEventListener('click', logout);
 
-  $('#btn-theme').addEventListener('click', (e) => {
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    toggleAppThemeMenu();
-  });
+  const loginThemeBtn = $('#btn-login-theme-toggle');
+  if (loginThemeBtn) loginThemeBtn.addEventListener('click', () => toggleUIMode());
+  const appThemeBtn = $('#btn-app-theme-toggle');
+  if (appThemeBtn) appThemeBtn.addEventListener('click', () => toggleUIMode());
 
-  $('#btn-login-theme').addEventListener('click', (e) => {
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    toggleLoginThemeMenu();
-  });
+  const accentWrap = document.querySelector('.accent-btns');
+  if (accentWrap) {
+    accentWrap.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-accent-toggle]');
+      if (!b) return;
+      const n = parseInt(b.getAttribute('data-accent-toggle'), 10);
+      if (n >= 1 && n <= 4) toggleAccentSlot(n);
+    });
+  }
 
-  $('#login-theme-chips').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-theme-set]');
-    if (!b || b.id === 'btn-login-theme') return;
-    setTheme(b.getAttribute('data-theme-set'));
-    closeLoginThemeMenu();
-  });
-
-  $('#app-theme-dd').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-theme-set]');
-    if (!b) return;
-    setTheme(b.getAttribute('data-theme-set'));
-    closeAppThemeMenu();
+  $$('.dock-item').forEach((b) => {
+    b.addEventListener('click', () => showSection(b.dataset.section));
   });
 
   document.addEventListener('click', (e) => {
-    const loginWrap = document.querySelector('#login-theme-chips.login-theme-dd');
-    if (!loginWrap || !loginWrap.contains(e.target)) closeLoginThemeMenu();
-    const appDd = $('#app-theme-dd');
-    if (!appDd || !appDd.contains(e.target)) closeAppThemeMenu();
     const rWrap = $('#refresh-split-wrap');
-    if (!rWrap || !rWrap.contains(e.target)) closeRefreshPopover();
+    const rPop = $('#refresh-popover');
+    const inRefresh =
+      (rWrap && rWrap.contains(e.target)) || (rPop && rPop.contains(e.target));
+    if (!inRefresh) closeRefreshPopover();
   });
 
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    closeAllThemeMenus();
     closeRefreshPopover();
-  });
-
-  $('#btn-menu').addEventListener('click', () => {
-    const sb = $('#sidebar');
-    const next = sb && !sb.classList.contains('open');
-    setSidebarOpen(next);
-  });
-
-  $('#sidebar-overlay').addEventListener('click', () => {
-    setSidebarOpen(false);
-  });
-
-  $$('.nav-btn').forEach((b) => {
-    b.addEventListener('click', () => {
-      showSection(b.dataset.section);
-      setSidebarOpen(false);
-    });
   });
 
   $('#user-search').addEventListener('input', () => {
@@ -1155,17 +1552,26 @@
     }
   });
 
-  $('#uri-close').addEventListener('click', () => $('#modal-uri').classList.add('hidden'));
-  $('#uri-copy').addEventListener('click', async () => {
-    const t = $('#uri-out').value;
-    if (!t) return;
-    try {
-      await navigator.clipboard.writeText(t);
-      toast('Строка hysteria2 скопирована');
-    } catch (e) {
-      toast('Не удалось скопировать', true);
-    }
-  });
+  const uriCloseBtn = $('#uri-close');
+  if (uriCloseBtn) {
+    uriCloseBtn.addEventListener('click', () => {
+      const m = $('#modal-uri');
+      if (m) m.classList.add('hidden');
+    });
+  }
+  const uriCopyBtn = $('#uri-copy');
+  if (uriCopyBtn) {
+    uriCopyBtn.addEventListener('click', async () => {
+      const t = $('#uri-out') && $('#uri-out').value;
+      if (!t) return;
+      try {
+        await navigator.clipboard.writeText(t);
+        toast('Строка hysteria2 скопирована');
+      } catch (e) {
+        toast('Не удалось скопировать', true);
+      }
+    });
+  }
   const btnCopySub = $('#uri-copy-sub');
   if (btnCopySub) {
     btnCopySub.addEventListener('click', async () => {
@@ -1181,88 +1587,75 @@
   }
 
   (function initTheme() {
-    let saved = localStorage.getItem(THEME_KEY);
-    if (THEMES.indexOf(saved) < 0) {
-      if (saved === 'dark') saved = 'tg-dark';
-      else if (saved === 'light') saved = 'light';
-      else saved = 'light';
+    const saved = _uiPrefGet(THEME_KEY);
+    if (saved === 'light' || saved === 'dark') {
+      setMode(saved);
+      return;
     }
-    setTheme(saved);
+    const legacyDark = ['ios26-liquid', 'tg-dark', 'crm-soft', 'accent-violet'];
+    if (saved && legacyDark.indexOf(saved) >= 0) {
+      setMode('dark');
+      _uiPrefSet(THEME_KEY, 'dark');
+      return;
+    }
+    const fromDoc = document.documentElement.getAttribute('data-theme');
+    if (fromDoc === 'light' || fromDoc === 'dark') {
+      setMode(fromDoc);
+      return;
+    }
+    setMode('dark');
   })();
+
+  loadAccents();
+  applyUiPrefs();
+  initSettingsSection();
+  syncModeLabels();
 
   (function initAutoRefreshControls() {
     const cb = $('#auto-refresh-on');
     const sel = $('#auto-refresh-interval');
     const btn = $('#btn-refresh-now');
     if (sel) {
-      const sec = localStorage.getItem(AUTO_INTERVAL_KEY);
+      const sec = _uiPrefGet(AUTO_INTERVAL_KEY);
       if (sec && ['5', '10', '30', '60'].indexOf(sec) >= 0) sel.value = sec;
       else sel.value = '5';
     }
     if (cb) {
-      const stored = localStorage.getItem(AUTO_REFRESH_KEY);
-      cb.checked = stored !== '0';
-      cb.addEventListener('change', () => {
-        localStorage.setItem(AUTO_REFRESH_KEY, cb.checked ? '1' : '0');
+      const persistAutoRefresh = () => {
+        const el = document.getElementById('auto-refresh-on');
+        if (!el) return;
+        _uiPrefSet(AUTO_REFRESH_KEY, el.checked ? '1' : '0');
         scheduleSectionRefresh();
-      });
+      };
+      const stored = _uiPrefGet(AUTO_REFRESH_KEY);
+      cb.checked = stored !== '0';
+      cb.addEventListener('change', persistAutoRefresh);
+      cb.addEventListener('input', persistAutoRefresh);
+      const swLab = cb.closest('.refresh-switch-label');
+      if (swLab) {
+        swLab.addEventListener('click', () => {
+          window.setTimeout(persistAutoRefresh, 0);
+        });
+      }
     }
     if (sel) {
       sel.addEventListener('change', () => {
-        localStorage.setItem(AUTO_INTERVAL_KEY, sel.value);
+        _uiPrefSet(AUTO_INTERVAL_KEY, sel.value);
         scheduleSectionRefresh();
       });
     }
     if (btn) btn.addEventListener('click', () => loadCurrentSection());
-  })();
 
-  (function initRefreshPopover() {
-    const menu = $('#btn-refresh-menu');
-    const pop = $('#refresh-popover');
-    if (!menu || !pop) return;
-    menu.addEventListener(
-      'click',
-      (e) => {
-        e.stopImmediatePropagation();
-        e.stopPropagation();
-        closeAllThemeMenus();
-        const open = pop.classList.contains('hidden');
-        if (open) {
-          pop.classList.remove('hidden');
-          menu.setAttribute('aria-expanded', 'true');
-        } else {
-          pop.classList.add('hidden');
-          menu.setAttribute('aria-expanded', 'false');
-        }
-      },
-      false,
-    );
-    pop.addEventListener('click', (e) => e.stopPropagation());
-  })();
-
-  (async function initSession() {
-    const jwtRaw = _getJwt();
-    const jwt = jwtRaw && String(jwtRaw).trim();
-    const headers = { Accept: 'application/json' };
-    if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
-    try {
-      const r = await fetch(apiUrl('/auth/me'), { credentials: 'include', headers: headers });
-      if (r.status === 401) {
-        _removeJwt();
-        showApp(false);
-        return;
+    window.addEventListener('storage', (e) => {
+      if (!e.key) return;
+      if (e.key === AUTO_REFRESH_KEY && cb) {
+        cb.checked = e.newValue !== '0';
+        scheduleSectionRefresh();
       }
-      if (!r.ok) {
-        /* НЕ вызывать _removeJwt: 502/503/429 и т.д. — сессия жива, иначе «вылет» при каждом глюке прокси */
-        showApp(false);
-        toast('Сервер временно недоступен (' + r.status + '). Обновите страницу через минуту.', true);
-        return;
+      if (e.key === AUTO_INTERVAL_KEY && sel && e.newValue && ['5', '10', '30', '60'].indexOf(e.newValue) >= 0) {
+        sel.value = e.newValue;
+        scheduleSectionRefresh();
       }
-      showApp(true);
-      showSection('overview');
-    } catch (e) {
-      showApp(false);
-      toast('Нет связи с панелью. Проверьте сеть и обновите страницу.', true);
-    }
+    });
   })();
 })();

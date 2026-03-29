@@ -1,8 +1,7 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="light">
+<html lang="ru" data-theme="dark">
 <head>
   <meta charset="utf-8" />
-  <!-- Без завершающего / относительные style.css и app.js резолвятся неверно; за прокси с префиксом нужен именно .../ui/ -->
   <script>
     (function () {
       var p = location.pathname;
@@ -12,13 +11,13 @@
       location.replace(p + '/' + location.search + location.hash);
     })();
   </script>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>HY2 Node Panel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" id="hljs-theme" />
-  <link rel="stylesheet" href="style.css?v=27.5" />
+  <link rel="stylesheet" href="style.css?v=32.5" />
 </head>
 <body>
   <div id="view-login" class="login-page">
@@ -27,28 +26,10 @@
     <div class="login-glow login-glow2" aria-hidden="true"></div>
     <div class="login-page-center">
       <div class="login-theme-bar">
-        <div class="login-theme-dd" id="login-theme-chips">
-          <button type="button" class="login-theme-dd-trigger" id="btn-login-theme" aria-expanded="false" aria-haspopup="listbox" aria-controls="login-theme-menu">
-            <span class="login-theme-dd-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M12 2.25a9.75 9.75 0 100 19.5 9.75 9.75 0 000-19.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                <path d="M12 2.25v19.5" stroke="currentColor" stroke-width="1.5"/>
-                <circle cx="8" cy="13" r="2" fill="currentColor" opacity="0.45"/>
-                <circle cx="12" cy="8" r="2" fill="currentColor" opacity="0.55"/>
-                <circle cx="16" cy="13" r="2" fill="currentColor" opacity="0.35"/>
-              </svg>
-            </span>
-            <span class="login-theme-dd-label" id="login-theme-current-label">iOS 26 Liquid</span>
-            <svg class="login-theme-dd-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <ul class="login-theme-dd-menu hidden" id="login-theme-menu" role="listbox" aria-label="Тема оформления">
-            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="ios26-liquid">iOS 26 Liquid</button></li>
-            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="tg-dark">TG Dark</button></li>
-            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="crm-soft">CRM soft</button></li>
-            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="light">Светлая</button></li>
-            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="accent-violet">Violet</button></li>
-          </ul>
-        </div>
+        <button type="button" class="theme-toggle-btn" id="btn-login-theme-toggle" title="Светлая / тёмная тема">
+          <span class="theme-toggle-track" aria-hidden="true"><span class="theme-toggle-thumb"></span></span>
+          <span id="login-theme-mode-label">Тёмная</span>
+        </button>
       </div>
       <div class="login-card">
         <div class="login-brand">
@@ -68,175 +49,112 @@
   </div>
 
   <div id="view-app" class="hidden">
-    <header class="topbar">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <button type="button" class="btn-icon mobile-nav-btn" id="btn-menu" aria-label="Меню"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-        <h1>HY2 <span class="badge-node mono" id="hdr-node">—</span></h1>
-        <span class="status-pill ok mono" id="hdr-online">онлайн</span>
-        <span class="mono" style="font-size:0.74rem;color:var(--muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="hdr-ver">—</span>
-      </div>
-      <div class="topbar-actions">
-        <div class="refresh-split-wrap" id="refresh-split-wrap">
-          <div class="refresh-split" role="group" aria-label="Обновление данных">
-            <button type="button" class="refresh-split-left" id="btn-refresh-now" title="Обновить сейчас">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 10-2.64 6.36"/><path d="M21 3v7h-7"/></svg>
-            </button>
-            <button type="button" class="refresh-split-right" id="btn-refresh-menu" title="Автообновление и интервал" aria-expanded="false" aria-haspopup="dialog" aria-controls="refresh-popover">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-          </div>
-          <div id="refresh-popover" class="refresh-popover hidden" role="dialog" aria-label="Параметры автообновления">
-            <div class="refresh-popover-arrow" aria-hidden="true"></div>
-            <div class="refresh-popover-inner">
-              <div class="refresh-popover-row">
-                <label class="refresh-switch-label">
-                  <input type="checkbox" id="auto-refresh-on" class="refresh-switch-input" />
-                  <span class="refresh-switch-ui" aria-hidden="true"></span>
-                </label>
-                <span class="refresh-popover-title">Автообновление</span>
-              </div>
-              <hr class="refresh-popover-divider" />
-              <div class="refresh-popover-field">
-                <label class="refresh-interval-label" for="auto-refresh-interval">Интервал</label>
-                <select id="auto-refresh-interval" class="refresh-interval-select" aria-label="Интервал автообновления">
-                  <option value="5">5s</option>
-                  <option value="10">10s</option>
-                  <option value="30">30s</option>
-                  <option value="60">60s</option>
-                </select>
-              </div>
-              <p class="refresh-popover-foot mono" id="hdr-last-refresh">—</p>
-            </div>
-          </div>
-        </div>
-        <div class="login-theme-dd topbar-theme-dd" id="app-theme-dd">
-          <button type="button" class="login-theme-dd-trigger" id="btn-theme" aria-expanded="false" aria-haspopup="listbox" aria-controls="app-theme-menu" title="Тема оформления">
-            <span class="login-theme-dd-ico" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M12 2.25a9.75 9.75 0 100 19.5 9.75 9.75 0 000-19.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-                <path d="M12 2.25v19.5" stroke="currentColor" stroke-width="1.5"/>
-                <circle cx="8" cy="13" r="2" fill="currentColor" opacity="0.45"/>
-                <circle cx="12" cy="8" r="2" fill="currentColor" opacity="0.55"/>
-                <circle cx="16" cy="13" r="2" fill="currentColor" opacity="0.35"/>
-              </svg>
-            </span>
-            <span class="login-theme-dd-label" id="app-theme-current-label">iOS 26 Liquid</span>
-            <svg class="login-theme-dd-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <ul class="login-theme-dd-menu hidden" id="app-theme-menu" role="listbox" aria-label="Тема оформления">
-            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="ios26-liquid">iOS 26 Liquid</button></li>
-            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="tg-dark">TG Dark</button></li>
-            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="crm-soft">CRM soft</button></li>
-            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="light">Светлая</button></li>
-            <li role="presentation"><button type="button" class="login-theme-dd-opt" role="option" data-theme-set="accent-violet">Violet</button></li>
-          </ul>
-        </div>
-        <button type="button" class="btn-icon" id="btn-logout">Выход</button>
-      </div>
-    </header>
-
-    <div class="app-shell">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-inner">
-        <div class="sidebar-brand">
-          <div class="t">Разделы</div>
-          <div class="n">Нода</div>
-        </div>
-        <button type="button" class="nav-btn active" data-section="overview">Обзор</button>
-        <button type="button" class="nav-btn" data-section="users">Пользователи</button>
-        <button type="button" class="nav-btn" data-section="config">Конфигурация</button>
-        <button type="button" class="nav-btn" data-section="server">Сервер</button>
-      </div>
-    </aside>
-
+    <div class="app-stack">
+      <div class="app-shell">
     <main>
-      <section id="sec-overview">
-        <div class="srv-dashboard">
-          <header class="srv-dash-intro">
-            <h2 class="srv-dash-h2">Обзор</h2>
-          </header>
+      <section id="sec-overview" class="srv-dashboard glassify">
+        <h2 class="hy2-sr-only">Обзор</h2>
 
-          <div class="srv-dash-card srv-dash-card--wide">
-            <div class="srv-dash-card-head">Сводка по ноде</div>
-            <div class="srv-dash-card-body srv-dash-card-body--block">
-              <div class="grid-metrics overview-summary">
-                <div class="metric metric--wide hidden" aria-hidden="true">
-                  <label>Адрес панели (HTTPS)</label>
-                  <div class="val overview-summary-url" id="m-panel-url">—</div>
-                </div>
-                <div class="metric metric--wide hidden" aria-hidden="true">
-                  <label>Домен для ссылок HY2 (SNI)</label>
-                  <div class="val overview-summary-url" id="m-hy2-domain">—</div>
-                  <div class="muted overview-summary-hint">Из public_base_url / hysteria_public_domain / сертификата</div>
-                </div>
-                <div class="metric metric-tint-neutral"><label>CPU</label><div class="val" id="m-cpu">—</div><div class="muted overview-summary-sub" id="m-cpu-sub">загрузка</div></div>
-                <div class="metric metric-tint-neutral"><label>ОЗУ</label><div class="val" id="m-mem">—</div><div class="muted overview-summary-sub" id="m-mem-sub">—</div></div>
-                <div class="metric metric-tint-neutral"><label>Свап</label><div class="val" id="m-swap">—</div><div class="muted overview-summary-sub" id="m-swap-sub">—</div></div>
-                <div class="metric metric-tint-neutral"><label>Онлайн (HY2)</label><div class="val" id="m-online">—</div><div class="muted overview-summary-sub" id="m-online-sub">пользователей</div></div>
-                <div class="metric metric-tint-neutral"><label>В конфиге</label><div class="val" id="m-users">—</div></div>
-                <div class="metric metric-tint-neutral"><label>Всего трафика</label><div class="val" id="m-traffic">—</div><div class="muted overview-summary-sub">Накопленно</div></div>
-                <div class="metric metric-tint-neutral"><label>Протокол</label><div class="val">QUIC / UDP</div></div>
-                <div class="metric metric-tint-neutral"><label>Uptime</label><div class="val" id="m-uptime">—</div></div>
-              </div>
+          <div class="hy2-metric-grid overview-summary" id="overview-metric-grid">
+            <div class="metric glass glass-panel hy2-metric glass-metric hidden" data-accent-slot="1">
+              <div class="hy2-mlabel">Панель</div>
+              <div class="hy2-mval mono overview-summary-url" id="m-panel-url">—</div>
+              <div class="hy2-msub muted">HTTPS</div>
+            </div>
+            <div class="metric glass glass-panel hy2-metric glass-metric hidden" data-accent-slot="4">
+              <div class="hy2-mlabel">HY2 домен</div>
+              <div class="hy2-mval mono overview-summary-url" id="m-hy2-domain">—</div>
+              <div class="hy2-msub muted">SNI / ссылки</div>
+            </div>
+            <div class="metric glass glass-panel hy2-metric glass-metric" data-accent-slot="2">
+              <div class="hy2-mlabel">CPU</div>
+              <div class="hy2-mval val" id="m-cpu">—</div>
+              <div class="hy2-msub" id="m-cpu-sub">загрузка</div>
+            </div>
+            <div class="metric glass glass-panel hy2-metric glass-metric" data-accent-slot="3">
+              <div class="hy2-mlabel">ОЗУ</div>
+              <div class="hy2-mval val" id="m-mem">—</div>
+              <div class="hy2-msub" id="m-mem-sub">—</div>
+            </div>
+            <div class="metric glass glass-panel hy2-metric glass-metric metric-tint-neutral" data-accent-slot="1">
+              <div class="hy2-mlabel">Свап</div>
+              <div class="hy2-mval val" id="m-swap">—</div>
+              <div class="hy2-msub" id="m-swap-sub">—</div>
+            </div>
+            <div class="metric glass glass-panel hy2-metric glass-metric metric-tint-neutral" data-accent-slot="2">
+              <div class="hy2-mlabel">Онлайн HY2</div>
+              <div class="hy2-mval val" id="m-online">—</div>
+              <div class="hy2-msub" id="m-online-sub">пользователей</div>
+            </div>
+            <div class="metric glass glass-panel hy2-metric glass-metric metric-tint-neutral" data-accent-slot="3">
+              <div class="hy2-mlabel">В конфиге</div>
+              <div class="hy2-mval" id="m-users">—</div>
+            </div>
+            <div class="metric glass glass-panel hy2-metric glass-metric metric-tint-neutral" data-accent-slot="4">
+              <div class="hy2-mlabel">Трафик всего</div>
+              <div class="hy2-mval" id="m-traffic">—</div>
+              <div class="hy2-msub">Накопленно</div>
+            </div>
+            <div class="metric glass glass-panel hy2-metric glass-metric metric-tint-neutral">
+              <div class="hy2-mlabel">Протокол</div>
+              <div class="hy2-mval">QUIC</div>
+            </div>
+            <div class="metric glass glass-panel hy2-metric glass-metric metric-tint-neutral">
+              <div class="hy2-mlabel">Uptime</div>
+              <div class="hy2-mval" id="m-uptime">—</div>
             </div>
           </div>
 
-          <div class="srv-dash-card srv-dash-card--wide">
-            <div class="srv-dash-card-head">Трафик за 30 дней</div>
-            <div class="srv-dash-card-body srv-dash-card-body--block overview-chart-block">
-              <div class="overview-bars-panel overview-bars-panel--fluid">
-                <div class="bars" id="chart-bars" role="img" aria-label="Гистограмма трафика"></div>
+          <div class="hy2-overview-charts">
+            <div class="glass glass-panel hy2-chart-panel">
+              <div class="hy2-card-title">Трафик за 30 дней</div>
+              <p class="hy2-chart-hint muted">Наведите или коснитесь линии — суммарный трафик всех пользователей за сутки (tx+rx). Данные на ноде, файл <span class="mono">data/traffic_daily.json</span>; границы суток — локальное время сервера.</p>
+              <div class="hy2-chart-canvas-wrap">
+                <canvas id="traffic-chart-canvas" aria-label="График трафика"></canvas>
               </div>
             </div>
           </div>
 
           <h3 class="srv-mgmt-title">Сессии / stats API</h3>
-          <table class="data">
-            <thead><tr><th>Идентификатор</th><th>Tx / Rx</th><th>Примечание</th></tr></thead>
-            <tbody id="tbl-conn"></tbody>
-          </table>
-        </div>
+          <div class="glass glass-panel hy2-table-wrap">
+            <table class="data">
+              <thead><tr><th>Идентификатор</th><th>Tx / Rx</th><th>Примечание</th></tr></thead>
+              <tbody id="tbl-conn"></tbody>
+            </table>
+          </div>
       </section>
 
-      <section id="sec-users" class="hidden">
-        <div class="srv-dashboard">
-          <header class="srv-dash-intro">
-            <h2 class="srv-dash-h2">Пользователи</h2>
-          </header>
-          <div class="srv-dash-card srv-dash-card--wide">
-            <div class="srv-dash-card-head">Поиск и добавление</div>
-            <div class="srv-dash-card-body srv-dash-card-body--block">
-              <div class="toolbar">
-                <span class="mono" id="users-online-summary" style="font-size:0.82rem;padding:6px 0;">Онлайн: —</span>
-                <input type="search" class="inp" id="user-search" placeholder="Поиск по telegram_id…" />
-                <button type="button" class="btn btn-primary" id="btn-add-user">Добавить</button>
-              </div>
+      <section id="sec-users" class="hidden srv-dashboard glassify">
+        <h2 class="hy2-sr-only">Пользователи</h2>
+          <div class="glass glass-panel hy2-toolbar-card">
+            <div class="toolbar">
+              <span class="mono" id="users-online-summary" style="font-size:0.82rem;padding:6px 0;">Онлайн: —</span>
+              <input type="search" class="inp" id="user-search" placeholder="Поиск по telegram_id…" />
+              <button type="button" class="btn btn-primary" id="btn-add-user">Добавить</button>
             </div>
           </div>
-          <table class="data">
-            <thead><tr><th>telegram_id</th><th>Трафик</th><th>Истекает</th><th>IP лимит</th><th>Статус</th><th></th></tr></thead>
-            <tbody id="tbl-users"></tbody>
-          </table>
-        </div>
+          <div class="glass glass-panel hy2-table-wrap">
+            <table class="data">
+              <thead><tr><th>telegram_id</th><th>Трафик</th><th>Истекает</th><th>IP лимит</th><th>Статус</th><th></th></tr></thead>
+              <tbody id="tbl-users"></tbody>
+            </table>
+          </div>
       </section>
 
-      <section id="sec-config" class="hidden">
-        <div class="srv-dashboard">
-          <header class="srv-dash-intro"><h2 class="srv-dash-h2">Конфигурация</h2></header>
-          <span class="config-badge">Только просмотр</span>
-          <div class="srv-dash-card srv-dash-card--wide">
+      <section id="sec-config" class="hidden srv-dashboard glassify">
+        <h2 class="hy2-sr-only">Конфигурация</h2>
+          <span class="config-badge hy2-chip">Только просмотр</span>
+          <div class="glass glass-panel hy2-config-card">
             <div class="srv-dash-card-head">Hysteria — YAML</div>
             <div class="srv-dash-card-body srv-dash-card-body--block" style="padding:0;">
               <pre class="config-pre mono"><code id="cfg-yaml" class="language-yaml"></code></pre>
             </div>
           </div>
-        </div>
       </section>
 
-      <section id="sec-server" class="hidden">
-        <div class="srv-dashboard">
-          <header class="srv-dash-intro"><h2 class="srv-dash-h2">Сервер</h2></header>
-          <div class="srv-dash-card srv-dash-hero">
+      <section id="sec-server" class="hidden srv-dashboard glassify">
+        <h2 class="hy2-sr-only">Сервер</h2>
+          <div class="glass glass-panel">
             <div class="srv-dash-card-head">Загрузка ресурсов</div>
             <div class="srv-dash-card-body srv-dash-card-body--block" style="padding:18px 14px 22px;">
               <div class="srv-gauges">
@@ -276,32 +194,191 @@
             </div>
           </div>
           <h3 class="srv-mgmt-title">Управление сервисами</h3>
-          <table class="data"><thead><tr><th>Сервис</th><th>Состояние</th><th>Действия</th></tr></thead><tbody id="tbl-svc"></tbody></table>
+          <div class="glass glass-panel hy2-table-wrap">
+            <table class="data"><thead><tr><th>Сервис</th><th>Состояние</th><th>Действия</th></tr></thead><tbody id="tbl-svc"></tbody></table>
+          </div>
           <div class="srv-dash-grid">
-            <div class="srv-dash-card"><h4 class="srv-dash-card-head">Hysteria 2</h4><div class="srv-dash-card-body"><span class="pill mono" id="srv-pill-hy-st">—</span><span class="pill pill-muted mono" id="srv-pill-hy-ver">—</span></div></div>
-            <div class="srv-dash-card"><h4 class="srv-dash-card-head">HY2 Agent</h4><div class="srv-dash-card-body"><span class="pill mono" id="srv-pill-agent-st">—</span></div></div>
-            <div class="srv-dash-card"><h4 class="srv-dash-card-head">TLS Статус</h4><div class="srv-dash-card-body"><span class="pill pill-ok mono" id="srv-pill-tls">Active</span><span class="pill pill-muted mono" id="srv-pill-domain-hint">Auto (ACME)</span></div></div>
-            <div class="srv-dash-card"><h4 class="srv-dash-card-head">Masquerade</h4><div class="srv-dash-card-body"><span class="pill pill-ok mono" id="srv-pill-masq">Enabled</span><span class="pill pill-muted mono" id="srv-pill-masq-mode">Proxy</span></div></div>
-            <div class="srv-dash-card"><h4 class="srv-dash-card-head">Stats Secret</h4><div class="srv-dash-card-body"><span class="pill pill-warn mono" id="srv-pill-stats">Internal Only</span></div></div>
-            <div class="srv-dash-card"><h4 class="srv-dash-card-head">Uptime</h4><div class="srv-dash-card-body"><span class="pill pill-ok mono" id="srv-pill-uptime-os">—</span></div></div>
-            <div class="srv-dash-card srv-dash-card--wide"><div class="srv-dash-card-head">Скорость (сеть)</div><div class="srv-dash-card-body srv-dash-card-body--block"><div class="srv-traffic-split">
+            <div class="glass glass-panel srv-dash-card"><h4 class="srv-dash-card-head">Hysteria 2</h4><div class="srv-dash-card-body"><span class="pill mono" id="srv-pill-hy-st">—</span><span class="pill pill-muted mono" id="srv-pill-hy-ver">—</span></div></div>
+            <div class="glass glass-panel srv-dash-card"><h4 class="srv-dash-card-head">HY2 Agent</h4><div class="srv-dash-card-body"><span class="pill mono" id="srv-pill-agent-st">—</span></div></div>
+            <div class="glass glass-panel srv-dash-card"><h4 class="srv-dash-card-head">TLS Статус</h4><div class="srv-dash-card-body"><span class="pill pill-ok mono" id="srv-pill-tls">Active</span><span class="pill pill-muted mono" id="srv-pill-domain-hint">Auto (ACME)</span></div></div>
+            <div class="glass glass-panel srv-dash-card"><h4 class="srv-dash-card-head">Masquerade</h4><div class="srv-dash-card-body"><span class="pill pill-ok mono" id="srv-pill-masq">Enabled</span><span class="pill pill-muted mono" id="srv-pill-masq-mode">Proxy</span></div></div>
+            <div class="glass glass-panel srv-dash-card"><h4 class="srv-dash-card-head">Stats Secret</h4><div class="srv-dash-card-body"><span class="pill pill-warn mono" id="srv-pill-stats">Internal Only</span></div></div>
+            <div class="glass glass-panel srv-dash-card"><h4 class="srv-dash-card-head">Uptime</h4><div class="srv-dash-card-body"><span class="pill pill-ok mono" id="srv-pill-uptime-os">—</span></div></div>
+            <div class="glass glass-panel srv-dash-card srv-dash-card--wide"><div class="srv-dash-card-head">Скорость (сеть)</div><div class="srv-dash-card-body srv-dash-card-body--block"><div class="srv-traffic-split">
               <div class="srv-traffic-item"><span class="srv-traffic-lab">Отправка</span><span class="srv-traffic-val mono" id="srv-net-up">—</span></div>
               <div class="srv-traffic-item"><span class="srv-traffic-lab">Загрузка</span><span class="srv-traffic-val mono" id="srv-net-down">—</span></div>
             </div></div></div>
           </div>
-        </div>
+      </section>
+
+      <section id="sec-settings" class="hidden srv-dashboard glassify">
+        <h2 class="hy2-sr-only">Настройки</h2>
+
+          <div class="glass glass-panel hy2-settings-card">
+            <div class="srv-dash-card-head">Оформление</div>
+            <div class="srv-dash-card-body srv-dash-card-body--block">
+              <p class="muted settings-panel-lead" style="font-size:0.88rem;margin:0 0 10px;line-height:1.45;">Режим экрана и размытие стекла. Сохраняется в браузере.</p>
+              <p class="muted" style="font-size:0.85rem;margin:0 0 12px;">Переключатель темы — в верхней панели; здесь — тонкая настройка стекла.</p>
+              <div class="settings-slider-row">
+                <label for="ui-blur-mult">Сила размытия стекла</label>
+                <input type="range" id="ui-blur-mult" min="50" max="150" value="100" />
+                <span class="settings-val" id="ui-blur-mult-val">100%</span>
+              </div>
+              <div class="settings-slider-row">
+                <label for="ui-chrome-blur">Размытие верхней и нижней панели</label>
+                <input type="range" id="ui-chrome-blur" min="0" max="100" value="100" />
+                <span class="settings-val" id="ui-chrome-blur-val">100%</span>
+              </div>
+              <p class="muted" style="font-size:0.8rem;margin:-2px 0 10px;line-height:1.45;">0 — почти прозрачное стекло (без размытия), 100 — как у общего ползунка «Сила размытия».</p>
+              <div class="settings-slider-row">
+                <label for="ui-sat-mult">Насыщенность стекла</label>
+                <input type="range" id="ui-sat-mult" min="75" max="125" value="100" />
+                <span class="settings-val" id="ui-sat-mult-val">100%</span>
+              </div>
+              <div class="settings-slider-row">
+                <label for="ui-font-scale">Масштаб шрифта</label>
+                <input type="range" id="ui-font-scale" min="90" max="110" value="100" />
+                <span class="settings-val" id="ui-font-scale-val">100%</span>
+              </div>
+              <label class="field" style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:8px;">
+                <input type="checkbox" id="ui-reduce-motion" />
+                <span>Уменьшить анимации</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="glass glass-panel hy2-settings-card">
+            <div class="srv-dash-card-body srv-dash-card-body--block">
+              <button type="button" class="btn btn-danger" id="ui-reset-defaults">Сбросить настройки вида</button>
+            </div>
+          </div>
       </section>
     </main>
+      </div>
+
+      <div class="app-chrome-top">
+        <header class="topbar glass glass-panel">
+          <div class="topbar-brand">
+            <h1>HY2 <span class="badge-node mono" id="hdr-node">—</span></h1>
+            <span class="status-pill ok mono" id="hdr-online">онлайн</span>
+            <span class="mono topbar-ver" id="hdr-ver">—</span>
+          </div>
+          <div class="topbar-actions">
+            <div class="refresh-split-wrap" id="refresh-split-wrap">
+              <div class="refresh-split" role="group" aria-label="Обновление данных">
+                <button type="button" class="refresh-split-left" id="btn-refresh-now" title="Обновить сейчас">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 10-2.64 6.36"/><path d="M21 3v7h-7"/></svg>
+                </button>
+                <button type="button" class="refresh-split-right" id="btn-refresh-menu" title="Автообновление и интервал" aria-expanded="false" aria-haspopup="dialog" aria-controls="refresh-popover">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+              </div>
+              <div id="refresh-popover" class="refresh-popover hidden" role="dialog" aria-label="Параметры автообновления">
+                <div class="refresh-popover-arrow" aria-hidden="true"></div>
+                <div class="refresh-popover-inner">
+                  <div class="refresh-popover-row">
+                    <label class="refresh-switch-label">
+                      <input type="checkbox" id="auto-refresh-on" class="refresh-switch-input" />
+                      <span class="refresh-switch-ui" aria-hidden="true"></span>
+                    </label>
+                    <span class="refresh-popover-title">Автообновление</span>
+                  </div>
+                  <hr class="refresh-popover-divider" />
+                  <div class="refresh-popover-field">
+                    <label class="refresh-interval-label" for="auto-refresh-interval">Интервал</label>
+                    <select id="auto-refresh-interval" class="refresh-interval-select" aria-label="Интервал автообновления">
+                      <option value="5">5s</option>
+                      <option value="10">10s</option>
+                      <option value="30">30s</option>
+                      <option value="60">60s</option>
+                    </select>
+                  </div>
+                  <p class="refresh-popover-foot mono" id="hdr-last-refresh">—</p>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="theme-toggle-btn" id="btn-app-theme-toggle" title="Светлая / тёмная тема" aria-label="Тема оформления: переключить светлый или тёмный режим">
+              <span class="theme-toggle-hint" aria-hidden="true">Тема</span>
+              <span class="theme-toggle-track" aria-hidden="true"><span class="theme-toggle-thumb"></span></span>
+              <span id="app-theme-mode-label" class="theme-mode-val">Тёмная</span>
+            </button>
+            <button type="button" class="btn-icon btn-icon--topbar-logout" id="btn-logout" aria-label="Выход" title="Выход">
+              <svg class="btn-icon-logout-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+              <span class="btn-icon-txt">Выход</span>
+            </button>
+          </div>
+        </header>
+
+        <div class="accent-bar glass glass-panel" aria-label="Акцентные цвета">
+          <span class="accent-bar-label">Акценты</span>
+          <div class="accent-btns">
+            <button type="button" class="accent-btn accent-btn-n1 on" data-accent-toggle="1" aria-pressed="true"><span class="accent-dot"></span>Фиолет<span class="accent-check">✓</span></button>
+            <button type="button" class="accent-btn accent-btn-n2 on" data-accent-toggle="2" aria-pressed="true"><span class="accent-dot"></span>Зелёный<span class="accent-check">✓</span></button>
+            <button type="button" class="accent-btn accent-btn-n3 on" data-accent-toggle="3" aria-pressed="true"><span class="accent-dot"></span>Оранж<span class="accent-check">✓</span></button>
+            <button type="button" class="accent-btn accent-btn-n4 on" data-accent-toggle="4" aria-pressed="true"><span class="accent-dot"></span>Синий<span class="accent-check">✓</span></button>
+          </div>
+        </div>
+      </div>
+
+      <nav class="dock glass glass-panel" aria-label="Разделы панели">
+        <button type="button" class="dock-item active" data-section="overview" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>
+          Обзор
+        </button>
+        <button type="button" class="dock-item" data-section="users">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+          Юзеры
+        </button>
+        <button type="button" class="dock-item" data-section="config">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          Конфиг
+        </button>
+        <button type="button" class="dock-item" data-section="server">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="6" rx="2"/><path d="M8 21h8M12 9v12"/></svg>
+          Сервер
+        </button>
+        <button type="button" class="dock-item" data-section="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          Ещё
+        </button>
+      </nav>
     </div>
   </div>
 
-  <div class="sidebar-overlay hidden" id="sidebar-overlay" aria-hidden="true"></div>
   <div id="modal-user" class="modal-backdrop hidden"><div class="modal"><h3>Новый пользователь</h3><div class="field"><label>telegram_id</label><input class="inp mono" id="mu-tg" inputmode="numeric" /></div><div class="field"><label>Пароль</label><input class="inp mono" id="mu-pw" /></div><div class="modal-footer"><button class="btn btn-ghost" id="mu-cancel">Отмена</button><button class="btn btn-primary" id="mu-save">Создать</button></div></div></div>
-  <div id="modal-uri" class="modal-backdrop hidden"><div class="modal"><h3>Подключение</h3><label class="field"><span>HTTPS подписка</span><textarea id="uri-sub-out" class="inp mono" readonly rows="2" style="width:100%"></textarea></label><label class="field"><span>Hysteria 2 URI</span><textarea id="uri-out" class="inp mono" readonly rows="3" style="width:100%"></textarea></label><div class="modal-footer"><button class="btn btn-ghost" id="uri-close">Закрыть</button></div></div></div>
+  <div id="modal-uri" class="modal-backdrop hidden">
+    <div class="modal modal--wide">
+      <h3>Подключение для клиента</h3>
+      <p class="lead" style="font-size:0.85rem;color:var(--amber);margin:0 0 12px;line-height:1.5;border-left:3px solid var(--amber);padding-left:10px;">
+        Две ссылки: <strong>1)</strong> HTTPS-подписка (лучше для HAPP — трафик и название) и <strong>2)</strong> одна строка <span class="mono">hysteria2://</span> для ручного импорта (QUIC).
+        Для подписки в HAPP: удалите старую → «+» → вставьте HTTPS URL → обновить.
+      </p>
+      <div id="uri-sub-block" class="hidden">
+        <label class="field" style="display:block;margin-bottom:8px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">1. Подписка по HTTPS (Apache → агент)</span>
+          <textarea id="uri-sub-out" class="inp mono" readonly rows="2" style="width:100%;resize:vertical;min-height:56px;font-size:0.76rem;"></textarea>
+        </label>
+        <p id="uri-sub-hint" class="lead" style="font-size:0.78rem;color:var(--muted);margin:0 0 12px;line-height:1.45;">
+          Должна начинаться с <span class="mono">https://</span> того же хоста, что и панель. Если не открывается — проверьте <span class="mono">public_base_url</span> в config.json агента и прокси Apache (см. обзор: «Домен для ссылок HY2»).
+        </p>
+      </div>
+      <p id="uri-no-sub" class="lead hidden" style="font-size:0.8rem;color:var(--amber);margin:0 0 12px;line-height:1.45;">
+        Нет ключа подписки: задайте <span class="mono">jwt_secret</span> (длиной ≥ 8) в config.json агента — тогда появится HTTPS-ссылка.
+      </p>
+      <label class="field" style="display:block;margin-bottom:10px;"><span style="font-size:0.8rem;font-weight:600;color:var(--muted);">2. Строка Hysteria 2 (QUIC / UDP)</span>
+        <textarea id="uri-out" class="inp mono" readonly rows="3" style="width:100%;resize:vertical;min-height:72px;font-size:0.78rem;"></textarea>
+      </label>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="uri-close">Закрыть</button>
+        <button type="button" class="btn btn-primary hidden" id="uri-copy-sub">Копировать HTTPS подписку</button>
+        <button type="button" class="btn btn-info" id="uri-copy">Копировать hysteria2://</button>
+      </div>
+    </div>
+  </div>
   <div id="toast" class="toast hidden"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/yaml.min.js"></script>
-  <script src="app.js?v=27.5"></script>
+  <script src="app.js?v=32.8"></script>
 </body>
 </html>
