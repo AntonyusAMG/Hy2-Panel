@@ -3,6 +3,9 @@ HY2 Node Agent — FastAPI. Конфиг: /opt/hy2-agent/config.json (путь �
 
 Накопительный трафик (ответ GET /traffic для панели и HAPP): по умолчанию пишется в data/traffic_counters.json
 рядом с agent.py (или в traffic_persist_path). Переживает перезапуск Hysteria и сервера. Отключить: "traffic_persist": false.
+
+Суточная статистика по всем пользователям (график «Трафик за N дней»): data/traffic_daily.json, путь можно задать traffic_daily_path.
+Заполняется при каждом GET /traffic (дельта суммарного tx+rx). Отдаётся GET /traffic/daily.
 """
 from __future__ import annotations
 
@@ -301,8 +304,22 @@ def _pairs_from_traffic_val(v: Any) -> tuple[int, int]:
         return 0, 0
 
 
+def _normalize_traffic_payload(raw: Any) -> Any:
+    """Как normalizeTrafficPayload в ui/app.js: сначала users на корне, иначе разворачиваем data."""
+    if not isinstance(raw, dict):
+        return raw
+    u = raw.get("users")
+    if isinstance(u, dict) and not isinstance(u, list):
+        return raw
+    d = raw.get("data")
+    if isinstance(d, dict) and not isinstance(d, list):
+        return d
+    return raw
+
+
 def _extract_traffic_users(raw: Any) -> tuple[dict[str, dict[str, Any]] | None, str]:
     """Выделяет карту user_id → объект счётчиков из ответа HY2. Режим: users_key | flat | none."""
+    raw = _normalize_traffic_payload(raw)
     if not isinstance(raw, dict):
         return None, "none"
     if "users" in raw and isinstance(raw["users"], dict) and not isinstance(raw["users"], list):
@@ -396,11 +413,15 @@ def _merge_traffic_persist_sync(raw: Any) -> Any:
 
 
 async def _traffic_with_persistence() -> Any:
-    if not _traffic_persist_enabled():
-        return await _stats_request("GET", "/traffic")
     async with _traffic_merge_lock:
         raw = await _stats_request("GET", "/traffic")
-        return await asyncio.to_thread(_merge_traffic_persist_sync, raw)
+        if _traffic_persist_enabled():
+            out = await asyncio.to_thread(_merge_traffic_persist_sync, raw)
+        else:
+            out = raw
+        tot = await asyncio.to_thread(_total_from_traffic_response, out)
+        await asyncio.to_thread(_record_daily_traffic_sample, tot)
+        return out
 
 
 def _traffic_persist_remove_user(tid: str) -> None:
@@ -417,6 +438,187 @@ def _traffic_persist_clear_user(tid: str) -> None:
     u = state.setdefault("users", {})
     u[tid] = {"base_up": 0, "base_down": 0, "last_up": 0, "last_down": 0}
     _write_traffic_state(state)
+
+
+# --- Суточный суммарный трафик (все пользователи), JSON на диске ---
+
+
+def _traffic_daily_path() -> Path:
+    p = _config.get("traffic_daily_path")
+    if p:
+        return Path(str(p)).expanduser()
+    return Path(__file__).resolve().parent / "data" / "traffic_daily.json"
+
+
+def _read_traffic_daily() -> dict[str, Any]:
+    path = _traffic_daily_path()
+    if not path.is_file():
+        return {"version": 1, "last_total": None, "last_date": None, "days": {}}
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        if not isinstance(d, dict):
+            return {"version": 1, "last_total": None, "last_date": None, "days": {}}
+        d.setdefault("version", 1)
+        days = d.get("days")
+        if not isinstance(days, dict):
+            d["days"] = {}
+        return d
+    except Exception:
+        return {"version": 1, "last_total": None, "last_date": None, "days": {}}
+
+
+def _write_traffic_daily(d: dict[str, Any]) -> None:
+    path = _traffic_daily_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(d, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)
+    except OSError as e:
+        try:
+            if tmp.is_file():
+                tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        print(f"HY2 agent: cannot write {path}: {e}", flush=True)
+        raise
+
+
+def _total_from_persist_state() -> int:
+    """Сумма накопленного tx+rx по traffic_counters.json (как после merge), если live /traffic пустой."""
+    if not _traffic_persist_enabled():
+        return 0
+    state = _read_traffic_state()
+    users = state.get("users")
+    if not isinstance(users, dict):
+        return 0
+    t = 0
+    for st in users.values():
+        if not isinstance(st, dict):
+            continue
+        bu = int(st.get("base_up") or 0)
+        bd = int(st.get("base_down") or 0)
+        lu = int(st.get("last_up") or 0)
+        ld = int(st.get("last_down") or 0)
+        t += bu + bd + lu + ld
+    return max(0, t)
+
+
+def _seed_traffic_daily_from_persist_if_needed() -> None:
+    """Если по дням всё 0, а persist есть — заполняем сегодня (график и файл)."""
+    persist_total = _total_from_persist_state()
+    if persist_total <= 0:
+        return
+    state = _read_traffic_daily()
+    days: dict[str, Any] = dict(state.get("days") if isinstance(state.get("days"), dict) else {})
+    if _traffic_daily_sum_days(days) > 0:
+        return
+    today = _local_today_str()
+    days[today] = persist_total
+    state["version"] = 1
+    state["days"] = days
+    state["last_total"] = persist_total
+    state["last_date"] = today
+    try:
+        _write_traffic_daily(state)
+    except OSError:
+        pass
+
+
+def _local_today_str() -> str:
+    return datetime.now().astimezone().date().isoformat()
+
+
+def _total_from_traffic_response(raw: Any) -> int:
+    """Сумма tx+rx по всем пользователям — та же логика, что у карточки «Трафик всего» в панели."""
+    root = _normalize_traffic_payload(raw)
+    extracted, _mode = _extract_traffic_users(root if isinstance(root, dict) else raw)
+    if extracted is not None:
+        s = 0
+        for v in extracted.values():
+            up, down = _pairs_from_traffic_val(v)
+            s += up + down
+        if s > 0:
+            return s
+    if not isinstance(root, dict):
+        return _total_from_persist_state()
+    skip = frozenset({"online", "data", "users", "meta", "server", "system", "version"})
+    s2 = 0
+    for k, v in root.items():
+        if k in skip:
+            continue
+        if isinstance(v, dict):
+            up, down = _pairs_from_traffic_val(v)
+            s2 += up + down
+    if s2 > 0:
+        return s2
+    return _total_from_persist_state()
+
+
+def _traffic_daily_sum_days(days: dict[str, Any]) -> int:
+    s = 0
+    for v in days.values():
+        try:
+            s += int(v)
+        except (TypeError, ValueError):
+            pass
+    return s
+
+
+def _record_daily_traffic_sample(total: int) -> None:
+    """Добавляет в календарный день дельту суммарного tx+rx по всем пользователям."""
+    today = _local_today_str()
+    total = max(0, int(total))
+    state = _read_traffic_daily()
+    days: dict[str, Any] = state.get("days") if isinstance(state.get("days"), dict) else {}
+    last_t = state.get("last_total")
+
+    if last_t is None:
+        state["last_total"] = total
+        state["last_date"] = today
+        # Первая запись: сохраняем как baseline (стартовую точку).
+        # НЕ записываем в days — total это весь накопленный трафик, а не дельта за сегодня.
+        # Дельты начнут правильно накапливаться со следующего вызова /traffic.
+        state["days"] = days
+        try:
+            _write_traffic_daily(state)
+        except OSError:
+            return
+        return
+
+    try:
+        prev = int(last_t)
+    except (TypeError, ValueError):
+        prev = total
+
+    delta = total - prev
+    if delta < 0:
+        state["last_total"] = total
+        state["last_date"] = today
+        state["days"] = days
+        try:
+            _write_traffic_daily(state)
+        except OSError:
+            return
+        _seed_traffic_daily_from_persist_if_needed()
+        return
+
+    days[today] = int(days.get(today, 0) or 0) + delta
+    state["last_total"] = total
+    state["last_date"] = today
+    try:
+        cutoff = datetime.now().astimezone().date() - timedelta(days=400)
+        cut_s = cutoff.isoformat()
+        days = {k: int(v) for k, v in days.items() if isinstance(k, str) and k >= cut_s}
+    except Exception:
+        days = {k: int(v) for k, v in days.items() if isinstance(k, str)}
+    state["days"] = days
+    try:
+        _write_traffic_daily(state)
+    except OSError:
+        return
 
 
 def _systemctl_is_active(unit: str) -> str:
@@ -1077,13 +1279,35 @@ async def traffic_all(_: dict = Depends(verify_bearer)) -> Any:
     return await _traffic_with_persistence()
 
 
+@app.get("/traffic/daily")
+async def traffic_daily(
+    days: int = Query(30, ge=1, le=366),
+    _: dict = Depends(verify_bearer),
+) -> dict[str, Any]:
+    """Суточные байты (tx+rx по всем пользователям) за последние days дней; даты — локальный календарь сервера."""
+    await asyncio.to_thread(_seed_traffic_daily_from_persist_if_needed)
+    state = await asyncio.to_thread(_read_traffic_daily)
+    by_day = state.get("days") if isinstance(state.get("days"), dict) else {}
+    end = datetime.now().astimezone().date()
+    rows: list[dict[str, Any]] = []
+    for i in range(days - 1, -1, -1):
+        d = (end - timedelta(days=i)).isoformat()
+        b = by_day.get(d, 0)
+        try:
+            bi = int(b)
+        except (TypeError, ValueError):
+            bi = 0
+        rows.append({"date": d, "bytes": max(0, bi)})
+    return {"days": rows}
+
+
 @app.get("/online")
 async def online_stats(_: dict = Depends(verify_bearer)) -> Any:
     """Прокси к встроенному HY2 Traffic Stats API: карта user_id → число подключений (клиентов)."""
     return await _stats_request("GET", "/online")
 
 
-@app.get("/traffic/{telegram_id}")
+@app.get("/traffic/{telegram_id:[0-9]+}")
 async def traffic_one(telegram_id: str, _: dict = Depends(verify_bearer)) -> Any:
     tid = _validate_tg_id(telegram_id)
     data = await _traffic_with_persistence()
@@ -1097,7 +1321,7 @@ async def traffic_one(telegram_id: str, _: dict = Depends(verify_bearer)) -> Any
     return {"telegram_id": tid, "data": data}
 
 
-@app.post("/traffic/{telegram_id}/reset")
+@app.post("/traffic/{telegram_id:[0-9]+}/reset")
 async def traffic_reset(telegram_id: str, _: dict = Depends(verify_bearer)) -> dict[str, Any]:
     tid = _validate_tg_id(telegram_id)
     # Популярные варианты API — если не сработает, вернём 501
