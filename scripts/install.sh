@@ -214,7 +214,8 @@ info "Копирование agent.py и ui..."
 cp -f "$NODE_AGENT_SRC/agent.py" /opt/hy2-agent/agent.py
 cp -f "$NODE_AGENT_SRC/requirements.txt" /opt/hy2-agent/requirements.txt
 if [[ -f "$NODE_AGENT_SRC/ui/index.html" ]]; then
-  cp -f "$NODE_AGENT_SRC/ui/index.html" /opt/hy2-agent/ui/index.html
+  # Весь статический UI: index.html, style.css, app.js и др. (раньше копировался только index.html → панель без стилей)
+  cp -a "${NODE_AGENT_SRC}/ui/." /opt/hy2-agent/ui/
 else
   warn "Нет ui/index.html — сгенерирован минимальный заглушечный файл"
   echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>HY2</title></head><body><p>HY2 UI</p></body></html>' > /opt/hy2-agent/ui/index.html
