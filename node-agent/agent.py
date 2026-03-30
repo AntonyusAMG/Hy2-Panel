@@ -61,6 +61,20 @@ def load_config() -> None:
     _ui_path = base / "ui" / "index.html"
 
 
+def _persist_user_expire(tid: str, expire_unix: int) -> None:
+    """Пишет user_expires[tid] в config.json и перечитывает _config (для панели и GET /sub)."""
+    path = CONFIG_PATH
+    with open(path, encoding="utf-8") as f:
+        cfg = json.load(f)
+    if "user_expires" not in cfg or not isinstance(cfg.get("user_expires"), dict):
+        cfg["user_expires"] = {}
+    cfg["user_expires"][tid] = int(expire_unix)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    load_config()
+
+
 @app.on_event("startup")
 async def startup() -> None:
     load_config()
@@ -171,6 +185,10 @@ class LoginBody(BaseModel):
 class UserCreate(BaseModel):
     telegram_id: str = Field(..., description="Telegram chat_id как строка цифр")
     password: str
+
+
+class UserExpireBody(BaseModel):
+    expire_unix: int = Field(..., description="Unix seconds; 0 = безлимит")
 
 
 class ConfigPut(BaseModel):
@@ -787,13 +805,22 @@ async def list_users(_: dict = Depends(verify_bearer)) -> dict[str, Any]:
     y = _read_hysteria_yaml()
     auth = y.get("auth") or {}
     if auth.get("type") != "userpass":
-        return {"users": [], "note": "auth.type is not userpass"}
+        return {"users": [], "expires": {}, "note": "auth.type is not userpass"}
     up = auth.get("userpass") or {}
     if isinstance(up, dict):
         users = list(up.keys())
     else:
         users = []
-    return {"users": users}
+    expires: dict[str, int] = {}
+    raw_ue = _config.get("user_expires")
+    if isinstance(raw_ue, dict):
+        for uid in users:
+            if uid in raw_ue:
+                try:
+                    expires[uid] = int(raw_ue[uid])
+                except (TypeError, ValueError):
+                    pass
+    return {"users": users, "expires": expires}
 
 
 def _host_from_url(s: str) -> str:
@@ -1256,6 +1283,17 @@ async def add_user(body: UserCreate, _: dict = Depends(verify_bearer)) -> dict[s
     _write_hysteria_yaml(y)
     await asyncio.to_thread(_restart_hysteria)
     return {"ok": True, "telegram_id": tid}
+
+
+@app.patch("/users/{telegram_id}/expire")
+async def patch_user_expire(
+    telegram_id: str,
+    body: UserExpireBody,
+    _: dict = Depends(verify_bearer),
+) -> dict[str, Any]:
+    tid = _validate_tg_id(telegram_id)
+    await asyncio.to_thread(_persist_user_expire, tid, int(body.expire_unix))
+    return {"ok": True, "telegram_id": tid, "expire_unix": int(body.expire_unix)}
 
 
 @app.delete("/users/{telegram_id}")

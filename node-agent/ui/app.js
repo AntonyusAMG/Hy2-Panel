@@ -262,6 +262,27 @@
     return data;
   }
 
+  /** Отображение unix-срока из user_expires (0 = безлимит). */
+  function formatUserExpire(expiresMap, id) {
+    if (!expiresMap || typeof expiresMap !== 'object') return '—';
+    const raw = expiresMap[id] != null ? expiresMap[id] : expiresMap[String(id)];
+    if (raw == null || raw === '') return '—';
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return '—';
+    if (n === 0) return 'безлимит';
+    const ms = n * 1000;
+    if (ms <= Date.now()) return 'истекла';
+    try {
+      return new Date(ms).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+    } catch (e) {
+      return '—';
+    }
+  }
+
   function formatBytes(n) {
     if (n == null || Number.isNaN(n)) return '—';
     const u = ['B','KB','MB','GB','TB'];
@@ -913,6 +934,7 @@
         sumEl.textContent = 'Онлайн: ' + onl.userCount + ' польз. · ' + onl.connCount + ' подкл.';
       }
       const ids = users.users || [];
+      const expMap = users.expires && typeof users.expires === 'object' ? users.expires : {};
       const pmap = perUserFromTraffic(traffic, ids);
       const q = ($('#user-search').value || '').trim().toLowerCase();
       const tb = $('#tbl-users');
@@ -936,7 +958,9 @@
         tr.innerHTML =
           '<td class="mono">' + id + '</td>' +
           '<td style="min-width:140px"><div class="mono" style="font-size:0.8rem">' + formatBytes(p.down) + ' ↓ / ' + formatBytes(p.up) + ' ↑</div><div class="progress"><i style="width:' + pct + '%"></i></div></td>' +
-          '<td class="muted">—</td><td class="muted">—</td>' +
+          '<td class="mono" style="font-size:0.85rem">' +
+          formatUserExpire(expMap, id) +
+          '</td><td class="muted">—</td>' +
           '<td>' + statusHtml + '</td>' +
           '<td class="hy2-tbl-actions"><div class="hy2-tbl-act-row">' +
           '<button type="button" class="btn btn-info hy2-tbl-act" data-act="link" data-id="' +
