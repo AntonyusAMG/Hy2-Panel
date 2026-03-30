@@ -108,7 +108,7 @@
           <div class="hy2-overview-charts">
             <div class="glass glass-panel hy2-chart-panel">
               <div class="hy2-card-title">Трафик за 30 дней</div>
-              <p class="hy2-chart-hint muted">Наведите или коснитесь линии — суммарный трафик всех пользователей за сутки (tx+rx). Данные на ноде, файл <span class="mono">data/traffic_daily.json</span>; границы суток — локальное время сервера.</p>
+              <p class="hy2-chart-hint muted">Наведите или коснитесь линии — суммарный трафик всех пользователей за сутки (скачано + отправлено, rx+tx). Данные на ноде, файл <span class="mono">data/traffic_daily.json</span>; границы суток — локальное время сервера.</p>
               <div class="hy2-chart-canvas-wrap">
                 <canvas id="traffic-chart-canvas" aria-label="График трафика"></canvas>
               </div>
@@ -118,7 +118,7 @@
           <h3 class="srv-mgmt-title">Сессии / stats API</h3>
           <div class="glass glass-panel hy2-table-wrap">
             <table class="data">
-              <thead><tr><th>Идентификатор</th><th>Tx / Rx</th><th>Примечание</th></tr></thead>
+              <thead><tr><th>Идентификатор</th><th>Скачано / Отправлено</th><th>Примечание</th></tr></thead>
               <tbody id="tbl-conn"></tbody>
             </table>
           </div>
@@ -135,7 +135,7 @@
           </div>
           <div class="glass glass-panel hy2-table-wrap">
             <table class="data">
-              <thead><tr><th>telegram_id</th><th>Трафик</th><th>Истекает</th><th>IP лимит</th><th>Статус</th><th></th></tr></thead>
+              <thead><tr><th>telegram_id</th><th>Скачано / Отправлено</th><th>Истекает</th><th>IP лимит</th><th>Статус</th><th></th></tr></thead>
               <tbody id="tbl-users"></tbody>
             </table>
           </div>
@@ -205,8 +205,8 @@
             <div class="glass glass-panel srv-dash-card"><h4 class="srv-dash-card-head">Stats Secret</h4><div class="srv-dash-card-body"><span class="pill pill-warn mono" id="srv-pill-stats">Internal Only</span></div></div>
             <div class="glass glass-panel srv-dash-card"><h4 class="srv-dash-card-head">Uptime</h4><div class="srv-dash-card-body"><span class="pill pill-ok mono" id="srv-pill-uptime-os">—</span></div></div>
             <div class="glass glass-panel srv-dash-card srv-dash-card--wide"><div class="srv-dash-card-head">Скорость (сеть)</div><div class="srv-dash-card-body srv-dash-card-body--block"><div class="srv-traffic-split">
-              <div class="srv-traffic-item"><span class="srv-traffic-lab">Отправка</span><span class="srv-traffic-val mono" id="srv-net-up">—</span></div>
-              <div class="srv-traffic-item"><span class="srv-traffic-lab">Загрузка</span><span class="srv-traffic-val mono" id="srv-net-down">—</span></div>
+              <div class="srv-traffic-item"><span class="srv-traffic-lab">Скачано (rx)</span><span class="srv-traffic-val mono" id="srv-net-down">—</span></div>
+              <div class="srv-traffic-item"><span class="srv-traffic-lab">Отправка (tx)</span><span class="srv-traffic-val mono" id="srv-net-up">—</span></div>
             </div></div></div>
           </div>
       </section>
@@ -379,6 +379,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/yaml.min.js"></script>
-  <script src="app.js?v=32.8"></script>
+  <script src="app.js?v=32.9"></script>
 </body>
 </html>

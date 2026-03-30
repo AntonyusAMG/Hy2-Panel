@@ -416,7 +416,7 @@
     if (traffic.online && Array.isArray(traffic.online)) {
       traffic.online.forEach((o) => rows.push({
         id: String(o.id || o.user || o.telegram_id || '—'),
-        pair: [formatBytes(o.tx || o.upload), formatBytes(o.rx || o.download)].join(' / '),
+        pair: [formatBytes(o.rx || o.download), formatBytes(o.tx || o.upload)].join(' / '),
         note: 'online',
       }));
       if (rows.length) return rows;
@@ -429,7 +429,7 @@
           const down = v.download ?? v.rx ?? 0;
           rows.push({
             id: id,
-            pair: formatBytes(up) + ' / ' + formatBytes(down),
+            pair: formatBytes(down) + ' / ' + formatBytes(up),
             note: 'накопленно',
           });
         }
@@ -935,7 +935,7 @@
         tr.dataset.telegramId = id;
         tr.innerHTML =
           '<td class="mono">' + id + '</td>' +
-          '<td style="min-width:140px"><div class="mono" style="font-size:0.8rem">' + formatBytes(p.up) + ' ↑ / ' + formatBytes(p.down) + ' ↓</div><div class="progress"><i style="width:' + pct + '%"></i></div></td>' +
+          '<td style="min-width:140px"><div class="mono" style="font-size:0.8rem">' + formatBytes(p.down) + ' ↓ / ' + formatBytes(p.up) + ' ↑</div><div class="progress"><i style="width:' + pct + '%"></i></div></td>' +
           '<td class="muted">—</td><td class="muted">—</td>' +
           '<td>' + statusHtml + '</td>' +
           '<td class="hy2-tbl-actions"><div class="hy2-tbl-act-row">' +
